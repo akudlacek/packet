@@ -1,35 +1,31 @@
 /*
- * packet.c
- *
- * Created: 5/4/2018 3:52:08 PM
- *  Author: arin
- */ 
+* packet.c
+*
+* Created: 5/4/2018 3:52:08 PM
+*  Author: arin
+*/
 
 
 #include "packet.h"
 
+#include <string.h>
+
 /******************************************************************************
 * Defines
 ******************************************************************************/
-#define RX_BUFFER_LEN_BYTES (MAX_PAYLOAD_LEN_BYTES + 4)
-
-
-/******************************************************************************
-* Variables
-******************************************************************************/
-struct
+typedef enum
 {
-	int8_t rx_byte;
-	uint8_t rx_buffer[RX_BUFFER_LEN_BYTES];
-	uint8_t rx_buffer_ind;
-} packet;
+	CHECKSUM_ERROR         = 0x02
+} packet_error_t;
+
 
 /******************************************************************************
 * Local Prototypes
 ******************************************************************************/
 static int16_t default_rx_byte(void);
 static void default_tx_data(uint8_t *data, uint32_t length);
-static void default_command_handler(packet_rx_t rx);
+static void default_command_handler(packet_rx_t packet_rx);
+static void error_handler(packet_inst_t *packet_inst, packet_error_t error);
 
 
 /******************************************************************************
@@ -39,9 +35,11 @@ static void default_command_handler(packet_rx_t rx);
 ******************************************************************************/
 void packet_get_config_defaults(packet_conf_t *packet_conf)
 {
-	packet_conf->rx_byte_fptr     = default_rx_byte;
-	packet_conf->tx_data_fprt     = default_tx_data;
-	packet_conf->cmd_handler_fptr = default_command_handler;
+	packet_conf->rx_byte_fptr          = default_rx_byte;
+	packet_conf->tx_data_fprt          = default_tx_data;
+	packet_conf->cmd_handler_fptr      = default_command_handler;
+	packet_conf->crc_16_fptr           = sw_crc;
+	packet_conf->clear_buffer_timeout         = 0xFFFFFFFF;
 }
 
 /******************************************************************************
@@ -51,9 +49,11 @@ void packet_get_config_defaults(packet_conf_t *packet_conf)
 ******************************************************************************/
 void packet_init(packet_inst_t *packet_inst, packet_conf_t packet_conf)
 {
-	packet_inst->conf.rx_byte_fptr     = packet_conf.rx_byte_fptr;
-	packet_inst->conf.tx_data_fprt     = packet_conf.tx_data_fprt;
-	packet_inst->conf.cmd_handler_fptr = packet_conf.cmd_handler_fptr;
+	packet_inst->conf.rx_byte_fptr          = packet_conf.rx_byte_fptr;
+	packet_inst->conf.tx_data_fprt          = packet_conf.tx_data_fprt;
+	packet_inst->conf.cmd_handler_fptr      = packet_conf.cmd_handler_fptr;
+	packet_inst->conf.crc_16_fptr           = packet_conf.crc_16_fptr;
+	packet_inst->conf.clear_buffer_timeout         = packet_conf.clear_buffer_timeout;
 }
 
 /******************************************************************************
@@ -61,87 +61,218 @@ void packet_init(packet_inst_t *packet_inst, packet_conf_t packet_conf)
 *
 *  \note
 ******************************************************************************/
-void packet_task(packet_inst_t *packet_inst)
+void packet_task(packet_inst_t *packet_inst, uint32_t current_time_tick)
 {
 	/*Get byte*/
-	packet.rx_byte = packet_inst->conf.rx_byte_fptr();
+	packet_inst->rx_byte = packet_inst->conf.rx_byte_fptr();
 	
-	/*If data received*/
-	if(packet.rx_byte != -1)
+	/*Check for received byte*/
+	if(packet_inst->rx_byte != -1)
 	{
-		/*Add to buffer*/
-		if(packet.rx_buffer_ind >= RX_BUFFER_LEN_BYTES)
+		/*Record time of last byte*/
+		packet_inst->last_tick = current_time_tick;
+		
+		/*Check buffer limit*/
+		if(packet_inst->rx_buffer_ind >= RX_BUFFER_LEN_BYTES)
 		{
-			/*Clear buffer*/
-			packet.rx_buffer_ind = 0;
-			//todo: buffer full error
-		}
-		else
-		{
-			/*Put in buffer*/
-			packet.rx_buffer[packet.rx_buffer_ind] = (uint8_t)packet.rx_byte;
-			packet.rx_buffer_ind++;
+			/*Set to the last byte*/
+			packet_inst->rx_buffer_ind = RX_BUFFER_LEN_BYTES - 1;
 		}
 		
+		/*Put received byte in buffer*/
+		packet_inst->rx_buffer[packet_inst->rx_buffer_ind] = (uint8_t)packet_inst->rx_byte;
+		packet_inst->rx_buffer_ind++;
+		
 		/*Check for valid packet - after ID and data length bytes received*/
-		if(packet.rx_buffer_ind >= 2)
+		if(packet_inst->rx_buffer_ind >= 2)
 		{
-			/*Check to see if data length is valid*/
-			if(packet.rx_buffer[1] > MAX_PAYLOAD_LEN_BYTES)
+			/*Copy LEN*/
+			packet_inst->packet_rx.len = packet_inst->rx_buffer[1];
+			
+			/*Check to see if data length limit*/
+			if(packet_inst->packet_rx.len > MAX_PAYLOAD_LEN_BYTES)
 			{
-				//todo: data length too large error
+				/*Set to the max bytes*/
+				packet_inst->packet_rx.len = MAX_PAYLOAD_LEN_BYTES;
 			}
 			
-			/*Check data length to see if all bytes received - the +4 is ID, SIZE, and two CHECKSUM bytes*/
-			else if((packet.rx_buffer[1] + 4) == packet.rx_buffer_ind)
+			/*Check data received to see if all bytes received - the +4 is ID, SIZE, and two CHECKSUM bytes*/
+			if((packet_inst->packet_rx.len + 4) == packet_inst->rx_buffer_ind)
 			{
+				/*Calculate checksum - performed on [ID][LEN][DATA] if LEN=0 then just [ID][LEN]*/
+				packet_inst->calc_crc_16_checksum = packet_inst->conf.crc_16_fptr(packet_inst->rx_buffer, (packet_inst->rx_buffer_ind - 2));
 				
-				/*Calculate checksum*/
+				/*Copy received CRC checksum*/
+				packet_inst->packet_rx.crc_16_checksum = ((uint16_t)(packet_inst->rx_buffer[packet_inst->rx_buffer_ind - 1] << 8) | (uint16_t)packet_inst->rx_buffer[packet_inst->rx_buffer_ind - 2]);
 				
+				/*Check if calculated checksum matches received*/
+				if(packet_inst->calc_crc_16_checksum == packet_inst->packet_rx.crc_16_checksum)
+				{
+					/*Copy ID*/
+					packet_inst->packet_rx.id = packet_inst->rx_buffer[0];
+					
+					/*Copy data - if data in packet*/
+					if(packet_inst->packet_rx.len > 0)
+					{
+						memcpy(packet_inst->packet_rx.payload, &packet_inst->rx_buffer[2], packet_inst->packet_rx.len);
+					}
+					/*Fill with zeros*/
+					else
+					{
+						memset(packet_inst->packet_rx.payload, 0, MAX_PAYLOAD_LEN_BYTES);
+					}
+					
+					/*Run command handler*/
+					packet_inst->conf.cmd_handler_fptr(packet_inst->packet_rx);
+				}
+				else
+				{
+					error_handler(packet_inst, CHECKSUM_ERROR);
+				}
+				
+				/*Clear buffer*/
+				packet_inst->rx_buffer_ind = 0;
 			}
 		}
+	}
+	
+	/*Clear buffer timeout*/
+	if((current_time_tick - packet_inst->last_tick) >= packet_inst->conf.clear_buffer_timeout)
+	{
+		/*Clear buffer*/
+		packet_inst->rx_buffer_ind = 0;
 	}
 }
 
 /******************************************************************************
-*  \brief Software CRC
+*  \brief Software CRC (SLOW)
 *
 *  \note https://barrgroup.com/Embedded-Systems/How-To/CRC-Calculation-C-Code
 ******************************************************************************/
-crc_t sw_crc(uint8_t const message[], int nBytes)
+crc_t sw_crc(uint8_t const message[], uint32_t num_bytes)
 {
-    crc_t remainder = 0;	
+	crc_t remainder = 0;
 
-    /*Perform modulo-2 division, a byte at a time.*/
-    for(int byte = 0; byte < nBytes; ++byte)
-    {
-        /*Bring the next byte into the remainder.*/
-        remainder ^= (message[byte] << (SW_CRC_WIDTH - 8));
+	/*Perform modulo-2 division, a byte at a time.*/
+	for(uint32_t byte = 0; byte < num_bytes; ++byte)
+	{
+		/*Bring the next byte into the remainder.*/
+		remainder ^= (message[byte] << (SW_CRC_WIDTH - 8));
 
-        /*Perform modulo-2 division, a bit at a time.*/
-        for(uint8_t bit = 8; bit > 0; --bit)
-        {
-            /*Try to divide the current data bit.*/
-            if(remainder & SW_CRC_TOPBIT)
-            {
-                remainder = (remainder << 1) ^ SW_CRC_POLYNOMIAL;
-            }
-            else
-            {
-                remainder = (remainder << 1);
-            }
-        }
-    }
+		/*Perform modulo-2 division, a bit at a time.*/
+		for(uint8_t bit = 8; bit > 0; --bit)
+		{
+			/*Try to divide the current data bit.*/
+			if(remainder & SW_CRC_TOPBIT)
+			{
+				remainder = (remainder << 1) ^ SW_CRC_POLYNOMIAL;
+			}
+			else
+			{
+				remainder = (remainder << 1);
+			}
+		}
+	}
 
-    /*The final remainder is the CRC result.*/
-    return remainder;
+	/*The final remainder is the CRC result.*/
+	return remainder;
 }
+
+/******************************************************************************
+*  \brief TX raw data
+*
+*  \note
+******************************************************************************/
+void packet_tx_raw(packet_inst_t *packet_inst, uint8_t id, uint8_t *data, uint8_t len)
+{
+	uint8_t packet[RX_BUFFER_LEN_BYTES];
+	uint16_t checksum;
+	
+	/*Limit len*/
+	len = (len > MAX_PAYLOAD_LEN_BYTES ? MAX_PAYLOAD_LEN_BYTES : len);
+	
+	/*Copy data to holding array*/
+	packet[0] = id;
+	packet[1] = len;
+	memcpy(&packet[2], data, len);
+	
+	/*Calc checksum*/
+	checksum = packet_inst->conf.crc_16_fptr(packet, (len + 2));
+	
+	/*Copy checksum*/
+	packet[2+len] = (uint8_t)checksum;
+	packet[3+len] = (uint8_t)(checksum >> 8);
+	
+	/*TX packet*/
+	packet_inst->conf.tx_data_fprt(packet, len + 4);
+}
+
+/******************************************************************************
+*  \brief TX float 32BIT
+*
+*  \note
+******************************************************************************/
+void packet_tx_float_32(packet_inst_t *packet_inst, uint8_t id, float data)
+{
+	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 4);
+}
+
+/******************************************************************************
+*  \brief TX double 64BIT
+*
+*  \note
+******************************************************************************/
+void packet_tx_double_64(packet_inst_t *packet_inst, uint8_t id, double data)
+{
+	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 8);
+}
+
+/******************************************************************************
+*  \brief TX 8BIT
+*
+*  \note
+******************************************************************************/
+void packet_tx_8(packet_inst_t *packet_inst, uint8_t id, uint8_t data)
+{
+	packet_tx_raw(packet_inst, id, &data, 1);
+}
+
+/******************************************************************************
+*  \brief TX 16BIT
+*
+*  \note
+******************************************************************************/
+void packet_tx_16(packet_inst_t *packet_inst, uint8_t id, uint16_t data)
+{
+	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 2);
+}
+
+/******************************************************************************
+*  \brief TX 32BIT
+*
+*  \note
+******************************************************************************/
+void packet_tx_32(packet_inst_t *packet_inst, uint8_t id, uint32_t data)
+{
+	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 4);
+}
+
+/******************************************************************************
+*  \brief TX 64BIT
+*
+*  \note
+******************************************************************************/
+void packet_tx_64(packet_inst_t *packet_inst, uint8_t id, uint64_t data)
+{
+	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 8);
+}
+
 
 /**************************************************************************************************
 *                                       LOCAL FUNCTIONS
 **************************************************************************************************/
 /******************************************************************************
-*  \brief default rx byte function
+*  \brief Default rx byte function
 *
 *  \note
 ******************************************************************************/
@@ -151,7 +282,7 @@ static int16_t default_rx_byte(void)
 }
 
 /******************************************************************************
-*  \brief default tx data function
+*  \brief Default tx data function
 *
 *  \note
 ******************************************************************************/
@@ -161,11 +292,25 @@ static void default_tx_data(uint8_t *data, uint32_t length)
 }
 
 /******************************************************************************
-*  \brief default command handler
+*  \brief Default command handler
 *
 *  \note
 ******************************************************************************/
-static void default_command_handler(packet_rx_t rx)
+static void default_command_handler(packet_rx_t packet_rx)
 {
 	//empty
+}
+
+/******************************************************************************
+*  \brief Error handler
+*
+*  \note
+******************************************************************************/
+static void error_handler(packet_inst_t *packet_inst, packet_error_t error)
+{
+	uint8_t data[1];
+	
+	data[0] = error;
+	
+	packet_tx_raw(packet_inst, 0xFF, data, 1);
 }

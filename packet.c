@@ -24,7 +24,7 @@ typedef enum
 ******************************************************************************/
 static int16_t default_rx_byte(void);
 static void default_tx_data(uint8_t *data, uint32_t length);
-static void default_command_handler(packet_rx_t packet_rx);
+static void default_command_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx);
 static void error_handler(packet_inst_t *packet_inst, packet_error_t error);
 
 
@@ -39,7 +39,8 @@ void packet_get_config_defaults(packet_conf_t *packet_conf)
 	packet_conf->tx_data_fprt          = default_tx_data;
 	packet_conf->cmd_handler_fptr      = default_command_handler;
 	packet_conf->crc_16_fptr           = sw_crc;
-	packet_conf->clear_buffer_timeout         = 0xFFFFFFFF;
+	packet_conf->clear_buffer_timeout  = 0xFFFFFFFF;
+	packet_conf->enable                = PACKET_ENABLED;
 }
 
 /******************************************************************************
@@ -53,7 +54,8 @@ void packet_init(packet_inst_t *packet_inst, packet_conf_t packet_conf)
 	packet_inst->conf.tx_data_fprt          = packet_conf.tx_data_fprt;
 	packet_inst->conf.cmd_handler_fptr      = packet_conf.cmd_handler_fptr;
 	packet_inst->conf.crc_16_fptr           = packet_conf.crc_16_fptr;
-	packet_inst->conf.clear_buffer_timeout         = packet_conf.clear_buffer_timeout;
+	packet_inst->conf.clear_buffer_timeout  = packet_conf.clear_buffer_timeout;
+	packet_inst->conf.enable                = packet_conf.enable;
 }
 
 /******************************************************************************
@@ -63,6 +65,9 @@ void packet_init(packet_inst_t *packet_inst, packet_conf_t packet_conf)
 ******************************************************************************/
 void packet_task(packet_inst_t *packet_inst, uint32_t current_time_tick)
 {
+	/*If packet is disabled do not run*/
+	if(packet_inst->conf.enable == PACKET_DISABLED) return;
+	
 	/*Get byte*/
 	packet_inst->rx_byte = packet_inst->conf.rx_byte_fptr();
 	
@@ -123,7 +128,7 @@ void packet_task(packet_inst_t *packet_inst, uint32_t current_time_tick)
 					}
 					
 					/*Run command handler*/
-					packet_inst->conf.cmd_handler_fptr(packet_inst->packet_rx);
+					packet_inst->conf.cmd_handler_fptr(packet_inst, packet_inst->packet_rx);
 				}
 				else
 				{
@@ -185,6 +190,9 @@ crc_t sw_crc(uint8_t const message[], uint32_t num_bytes)
 ******************************************************************************/
 void packet_tx_raw(packet_inst_t *packet_inst, uint8_t id, uint8_t *data, uint8_t len)
 {
+	/*If packet is disabled do not run*/
+	if(packet_inst->conf.enable == PACKET_DISABLED) return;
+	
 	uint8_t packet[RX_BUFFER_LEN_BYTES];
 	uint16_t checksum;
 	
@@ -267,6 +275,15 @@ void packet_tx_64(packet_inst_t *packet_inst, uint8_t id, uint64_t data)
 	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 8);
 }
 
+/******************************************************************************
+*  \brief Packet enable disable
+*
+*  \note disables or enables packet task and packet_tx_raw
+******************************************************************************/
+void packet_enable(packet_inst_t *packet_inst, packet_enable_t enable)
+{
+	packet_inst->conf.enable = enable;
+}
 
 /**************************************************************************************************
 *                                       LOCAL FUNCTIONS
@@ -296,7 +313,7 @@ static void default_tx_data(uint8_t *data, uint32_t length)
 *
 *  \note
 ******************************************************************************/
-static void default_command_handler(packet_rx_t packet_rx)
+static void default_command_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx)
 {
 	//empty
 }

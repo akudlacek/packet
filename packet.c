@@ -37,7 +37,7 @@ void packet_get_config_defaults(packet_conf_t *packet_conf)
 {
 	packet_conf->rx_byte_fptr          = default_rx_byte;
 	packet_conf->tx_data_fprt          = default_tx_data;
-	packet_conf->cmd_handler_fptr      = default_command_handler;
+	packet_conf->cmd_handler_fptr      = (void *)default_command_handler;
 	packet_conf->crc_16_fptr           = sw_crc;
 	packet_conf->clear_buffer_timeout  = 0xFFFFFFFF;
 	packet_conf->enable                = PACKET_ENABLED;

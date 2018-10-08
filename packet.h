@@ -46,7 +46,13 @@ typedef	struct
 {
 	int16_t (*rx_byte_fptr)(void);                            //function pointer for received byte return -1 for no data or >=0 for valid data
 	void (*tx_data_fprt)(uint8_t *, uint32_t);                //function pointer for transmit, ptr to 8 bit data array and length
+	
+	/****!!!! Void ptr in field 1 is actually (packet_inst_t *),  !!!!****
+	 ****!!!! the reason for this is this type is within          !!!!****
+	 ****!!!! packet_inst_t and is not yet defined, I don't know  !!!!****
+	 ****!!!! of a better way to do this                          !!!!****/
 	void (*cmd_handler_fptr)(void *, packet_rx_t);            //function pointer for command handler
+	
 	uint16_t (*crc_16_fptr)(const uint8_t *, uint32_t);       //function pointer for crc-16, default will be sw_crc
 	uint32_t clear_buffer_timeout;                            //timeout for buffer to be cleared when incomplete packet received
 	packet_enable_t enable;                                   //enable or disable packet instance

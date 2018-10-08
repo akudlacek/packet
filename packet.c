@@ -5,6 +5,19 @@
 *  Author: arin
 */
 
+/*
+* Packet format:
+* Little endian meaning LSB sent first e.g 0x40CC is sent as 0xCC 0x40 same is expected for receive
+* 
+* 0x12345678
+*   ^^    ^^
+*  MSB   LSB
+*  LAST  1ST
+*
+* NO DATA LEN=0: [ID][LEN][CRC16 on ID and LEN BYTE:0,BYTE:1]
+*    DATA LEN>0: [ID][LEN][BYTE:0 ... BYTE:n][CRC16 on ID, LEN, and DATA0..DATA:n BYTE:0,BYTE:1]
+*/
+
 
 #include "packet.h"
 
@@ -153,6 +166,9 @@ void packet_task(packet_inst_t *packet_inst, uint32_t current_time_tick)
 *  \brief Software CRC (SLOW)
 *
 *  \note https://barrgroup.com/Embedded-Systems/How-To/CRC-Calculation-C-Code
+*        CRC16_CCIT_ZERO
+*        CRC-16 (CRC-CCITT)
+*        Calculator: http://www.sunshine2k.de/coding/javascript/crc/crc_js.html
 ******************************************************************************/
 crc_t sw_crc(uint8_t const message[], uint32_t num_bytes)
 {

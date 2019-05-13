@@ -1,0 +1,3 @@
+[submodule "src/ring_buffer"]
+	path = src/ring_buffer
+	url = https://github.com/akudlacek/ring_buffer.git

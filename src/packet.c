@@ -36,9 +36,9 @@ typedef enum
 *                                         LOCAL PROTOTYPES
 *************************************************^************************************************/
 static int16_t default_rx_byte(void);
-static void default_tx_data(uint8_t *data, uint32_t length);
-static void default_command_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx);
-static void error_handler(packet_inst_t *packet_inst, packet_error_t error);
+static void default_tx_data(const uint8_t * const data, uint32_t length);
+static void default_command_handler(packet_inst_t * const packet_inst, packet_rx_t packet_rx);
+static void error_handler(packet_inst_t * const packet_inst, packet_error_t error);
 
 
 /**************************************************************************************************
@@ -49,8 +49,9 @@ static void error_handler(packet_inst_t *packet_inst, packet_error_t error);
 *
 *  \note
 ******************************************************************************/
-void packet_get_config_defaults(packet_conf_t *packet_conf)
+void packet_get_config_defaults(packet_conf_t * const packet_conf)
 {
+	packet_conf->tick_ms_ptr           = NULL;
 	packet_conf->rx_byte_fptr          = default_rx_byte;
 	packet_conf->tx_data_fprt          = default_tx_data;
 	packet_conf->cmd_handler_fptr      = (void *)default_command_handler;
@@ -64,8 +65,9 @@ void packet_get_config_defaults(packet_conf_t *packet_conf)
 *
 *  \note
 ******************************************************************************/
-void packet_init(packet_inst_t *packet_inst, packet_conf_t packet_conf)
+void packet_init(packet_inst_t * const packet_inst, packet_conf_t packet_conf)
 {
+	packet_inst->conf.tick_ms_ptr           = packet_conf.tick_ms_ptr;
 	packet_inst->conf.rx_byte_fptr          = packet_conf.rx_byte_fptr;
 	packet_inst->conf.tx_data_fprt          = packet_conf.tx_data_fprt;
 	packet_inst->conf.cmd_handler_fptr      = packet_conf.cmd_handler_fptr;
@@ -79,7 +81,7 @@ void packet_init(packet_inst_t *packet_inst, packet_conf_t packet_conf)
 *
 *  \note
 ******************************************************************************/
-void packet_task(packet_inst_t *packet_inst, uint32_t current_time_tick)
+void packet_task(packet_inst_t * const packet_inst)
 {
 	/*If packet is disabled do not run*/
 	if(packet_inst->conf.enable == PACKET_DISABLED) return;
@@ -91,7 +93,7 @@ void packet_task(packet_inst_t *packet_inst, uint32_t current_time_tick)
 	if(packet_inst->rx_byte != -1)
 	{
 		/*Record time of last byte*/
-		packet_inst->last_tick = current_time_tick;
+		packet_inst->last_tick = *packet_inst->conf.tick_ms_ptr;
 		
 		/*Check buffer limit*/
 		if(packet_inst->rx_buffer_ind >= RX_BUFFER_LEN_BYTES)
@@ -158,7 +160,7 @@ void packet_task(packet_inst_t *packet_inst, uint32_t current_time_tick)
 	}
 	
 	/*Clear buffer timeout*/
-	if((current_time_tick - packet_inst->last_tick) >= packet_inst->conf.clear_buffer_timeout)
+	if((*packet_inst->conf.tick_ms_ptr - packet_inst->last_tick) >= packet_inst->conf.clear_buffer_timeout)
 	{
 		/*Clear buffer*/
 		packet_inst->rx_buffer_ind = 0;
@@ -173,7 +175,7 @@ void packet_task(packet_inst_t *packet_inst, uint32_t current_time_tick)
 *        CRC-16 (CRC-CCITT)
 *        Calculator: http://www.sunshine2k.de/coding/javascript/crc/crc_js.html
 ******************************************************************************/
-crc_t sw_crc(uint8_t const message[], uint32_t num_bytes)
+crc_t sw_crc(const uint8_t * const message, uint32_t num_bytes)
 {
 	crc_t remainder = 0;
 
@@ -207,7 +209,7 @@ crc_t sw_crc(uint8_t const message[], uint32_t num_bytes)
 *
 *  \note
 ******************************************************************************/
-void packet_tx_raw(packet_inst_t *packet_inst, uint8_t id, uint8_t *data, uint8_t len)
+void packet_tx_raw(packet_inst_t * const packet_inst, uint8_t id, const uint8_t * const data, uint8_t len)
 {
 	/*If packet is disabled do not run*/
 	if(packet_inst->conf.enable == PACKET_DISABLED) return;
@@ -239,7 +241,7 @@ void packet_tx_raw(packet_inst_t *packet_inst, uint8_t id, uint8_t *data, uint8_
 *
 *  \note
 ******************************************************************************/
-void packet_tx_float_32(packet_inst_t *packet_inst, uint8_t id, float data)
+void packet_tx_float_32(packet_inst_t * const packet_inst, uint8_t id, float data)
 {
 	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 4);
 }
@@ -249,7 +251,7 @@ void packet_tx_float_32(packet_inst_t *packet_inst, uint8_t id, float data)
 *
 *  \note
 ******************************************************************************/
-void packet_tx_double_64(packet_inst_t *packet_inst, uint8_t id, double data)
+void packet_tx_double_64(packet_inst_t * const packet_inst, uint8_t id, double data)
 {
 	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 8);
 }
@@ -259,7 +261,7 @@ void packet_tx_double_64(packet_inst_t *packet_inst, uint8_t id, double data)
 *
 *  \note
 ******************************************************************************/
-void packet_tx_8(packet_inst_t *packet_inst, uint8_t id, uint8_t data)
+void packet_tx_8(packet_inst_t * const packet_inst, uint8_t id, uint8_t data)
 {
 	packet_tx_raw(packet_inst, id, &data, 1);
 }
@@ -269,7 +271,7 @@ void packet_tx_8(packet_inst_t *packet_inst, uint8_t id, uint8_t data)
 *
 *  \note
 ******************************************************************************/
-void packet_tx_16(packet_inst_t *packet_inst, uint8_t id, uint16_t data)
+void packet_tx_16(packet_inst_t * const packet_inst, uint8_t id, uint16_t data)
 {
 	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 2);
 }
@@ -279,7 +281,7 @@ void packet_tx_16(packet_inst_t *packet_inst, uint8_t id, uint16_t data)
 *
 *  \note
 ******************************************************************************/
-void packet_tx_32(packet_inst_t *packet_inst, uint8_t id, uint32_t data)
+void packet_tx_32(packet_inst_t * const packet_inst, uint8_t id, uint32_t data)
 {
 	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 4);
 }
@@ -289,7 +291,7 @@ void packet_tx_32(packet_inst_t *packet_inst, uint8_t id, uint32_t data)
 *
 *  \note
 ******************************************************************************/
-void packet_tx_64(packet_inst_t *packet_inst, uint8_t id, uint64_t data)
+void packet_tx_64(packet_inst_t * const packet_inst, uint8_t id, uint64_t data)
 {
 	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 8);
 }
@@ -299,7 +301,7 @@ void packet_tx_64(packet_inst_t *packet_inst, uint8_t id, uint64_t data)
 *
 *  \note disables or enables packet task and packet_tx_raw
 ******************************************************************************/
-void packet_enable(packet_inst_t *packet_inst, packet_enable_t enable)
+void packet_enable(packet_inst_t * const packet_inst, packet_enable_t enable)
 {
 	packet_inst->conf.enable = enable;
 }
@@ -323,7 +325,7 @@ static int16_t default_rx_byte(void)
 *
 *  \note
 ******************************************************************************/
-static void default_tx_data(uint8_t *data, uint32_t length)
+static void default_tx_data(const uint8_t * const data, uint32_t length)
 {
 	//empty
 }
@@ -333,7 +335,7 @@ static void default_tx_data(uint8_t *data, uint32_t length)
 *
 *  \note
 ******************************************************************************/
-static void default_command_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx)
+static void default_command_handler(packet_inst_t * const packet_inst, packet_rx_t packet_rx)
 {
 	//empty
 }
@@ -343,7 +345,7 @@ static void default_command_handler(packet_inst_t *packet_inst, packet_rx_t pack
 *
 *  \note
 ******************************************************************************/
-static void error_handler(packet_inst_t *packet_inst, packet_error_t error)
+static void error_handler(packet_inst_t * const packet_inst, packet_error_t error)
 {
 	uint8_t data[1];
 	

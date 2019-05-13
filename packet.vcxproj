@@ -21,9 +21,11 @@
   <ItemGroup>
     <ClCompile Include="src\main.c" />
     <ClCompile Include="src\packet.c" />
+    <ClCompile Include="src\ring_buffer\ring_buffer.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\packet.h" />
+    <ClInclude Include="src\ring_buffer\ring_buffer.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>

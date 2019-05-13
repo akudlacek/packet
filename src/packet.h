@@ -44,8 +44,9 @@ typedef struct
 /*Packet configuration struct*/
 typedef	struct
 {
+	const volatile uint32_t *tick_ms_ptr;                     //pointer to sys tick in mS
 	int16_t (*rx_byte_fptr)(void);                            //function pointer for received byte return -1 for no data or >=0 for valid data
-	void (*tx_data_fprt)(uint8_t *, uint32_t);                //function pointer for transmit, ptr to 8 bit data array and length
+	void (*tx_data_fprt)(const uint8_t * const, uint32_t);    //function pointer for transmit, ptr to 8 bit data array and length
 	
 	/****!!!! Void ptr in field 1 is actually (packet_inst_t *),  !!!!****
 	 ****!!!! the reason for this is this type is within          !!!!****
@@ -75,18 +76,18 @@ typedef struct
 /**************************************************************************************************
 *                                            PROTOTYPES
 *************************************************^************************************************/
-void packet_get_config_defaults(packet_conf_t *packet_conf);
-void packet_init(packet_inst_t *packet_inst, packet_conf_t packet_conf);
-void packet_task(packet_inst_t *packet_inst, uint32_t current_time_tick);
-crc_t sw_crc(uint8_t const message[], uint32_t num_bytes);
-void packet_tx_raw(packet_inst_t *packet_inst, uint8_t id, uint8_t *data, uint8_t len);
-void packet_tx_float_32(packet_inst_t *packet_inst, uint8_t id, float data);
-void packet_tx_double_64(packet_inst_t *packet_inst, uint8_t id, double data);
-void packet_tx_8(packet_inst_t *packet_inst, uint8_t id, uint8_t data);
-void packet_tx_16(packet_inst_t *packet_inst, uint8_t id, uint16_t data);
-void packet_tx_32(packet_inst_t *packet_inst, uint8_t id, uint32_t data);
-void packet_tx_64(packet_inst_t *packet_inst, uint8_t id, uint64_t data);
-void packet_enable(packet_inst_t *packet_inst, packet_enable_t enable);
+void packet_get_config_defaults(packet_conf_t * const packet_conf);
+void packet_init(packet_inst_t * const packet_inst, packet_conf_t packet_conf);
+void packet_task(packet_inst_t * const packet_inst);
+crc_t sw_crc(const uint8_t * const message, uint32_t num_bytes);
+void packet_tx_raw(packet_inst_t * const packet_inst, uint8_t id, const uint8_t * const data, uint8_t len);
+void packet_tx_float_32(packet_inst_t * const packet_inst, uint8_t id, float data);
+void packet_tx_double_64(packet_inst_t * const packet_inst, uint8_t id, double data);
+void packet_tx_8(packet_inst_t * const packet_inst, uint8_t id, uint8_t data);
+void packet_tx_16(packet_inst_t * const packet_inst, uint8_t id, uint16_t data);
+void packet_tx_32(packet_inst_t * const packet_inst, uint8_t id, uint32_t data);
+void packet_tx_64(packet_inst_t * const packet_inst, uint8_t id, uint64_t data);
+void packet_enable(packet_inst_t * const packet_inst, packet_enable_t enable);
 
 
 #endif /* PACKET_H_ */

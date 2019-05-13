@@ -81,13 +81,21 @@ void packet_init(packet_inst_t * const packet_inst, packet_conf_t packet_conf);
 void packet_task(packet_inst_t * const packet_inst);
 crc_t sw_crc(const uint8_t * const message, uint32_t num_bytes);
 void packet_tx_raw(packet_inst_t * const packet_inst, uint8_t id, const uint8_t * const data, uint8_t len);
-void packet_tx_float_32(packet_inst_t * const packet_inst, uint8_t id, float data);
-void packet_tx_double_64(packet_inst_t * const packet_inst, uint8_t id, double data);
 void packet_tx_8(packet_inst_t * const packet_inst, uint8_t id, uint8_t data);
 void packet_tx_16(packet_inst_t * const packet_inst, uint8_t id, uint16_t data);
 void packet_tx_32(packet_inst_t * const packet_inst, uint8_t id, uint32_t data);
 void packet_tx_64(packet_inst_t * const packet_inst, uint8_t id, uint64_t data);
+void packet_tx_float_32(packet_inst_t * const packet_inst, uint8_t id, float data);
+void packet_tx_double_64(packet_inst_t * const packet_inst, uint8_t id, double data);
 void packet_enable(packet_inst_t * const packet_inst, packet_enable_t enable);
+uint16_t packet_payload_uint16(packet_rx_t packet_rx);
+int16_t packet_payload_int16(packet_rx_t packet_rx);
+uint32_t packet_payload_uint32(packet_rx_t packet_rx);
+int32_t packet_payload_int32(packet_rx_t packet_rx);
+uint64_t packet_payload_uint64(packet_rx_t packet_rx);
+int64_t packet_payload_int64(packet_rx_t packet_rx);
+float packet_payload_float_32(packet_rx_t packet_rx);
+double packet_payload_double_64(packet_rx_t packet_rx);
 
 
 #endif /* PACKET_H_ */

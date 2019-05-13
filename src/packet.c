@@ -237,26 +237,6 @@ void packet_tx_raw(packet_inst_t * const packet_inst, uint8_t id, const uint8_t 
 }
 
 /******************************************************************************
-*  \brief TX float 32BIT
-*
-*  \note
-******************************************************************************/
-void packet_tx_float_32(packet_inst_t * const packet_inst, uint8_t id, float data)
-{
-	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 4);
-}
-
-/******************************************************************************
-*  \brief TX double 64BIT
-*
-*  \note
-******************************************************************************/
-void packet_tx_double_64(packet_inst_t * const packet_inst, uint8_t id, double data)
-{
-	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 8);
-}
-
-/******************************************************************************
 *  \brief TX 8BIT
 *
 *  \note
@@ -297,6 +277,26 @@ void packet_tx_64(packet_inst_t * const packet_inst, uint8_t id, uint64_t data)
 }
 
 /******************************************************************************
+*  \brief TX float 32BIT
+*
+*  \note
+******************************************************************************/
+void packet_tx_float_32(packet_inst_t * const packet_inst, uint8_t id, float data)
+{
+	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 4);
+}
+
+/******************************************************************************
+*  \brief TX double 64BIT
+*
+*  \note
+******************************************************************************/
+void packet_tx_double_64(packet_inst_t * const packet_inst, uint8_t id, double data)
+{
+	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 8);
+}
+
+/******************************************************************************
 *  \brief Packet enable disable
 *
 *  \note disables or enables packet task and packet_tx_raw
@@ -304,6 +304,148 @@ void packet_tx_64(packet_inst_t * const packet_inst, uint8_t id, uint64_t data)
 void packet_enable(packet_inst_t * const packet_inst, packet_enable_t enable)
 {
 	packet_inst->conf.enable = enable;
+}
+
+/******************************************************************************
+*  \brief Packet payload convert to uint16
+*
+*  \note
+******************************************************************************/
+uint16_t packet_payload_uint16(packet_rx_t packet_rx)
+{
+	uint16_t tmp;
+
+	tmp = ((uint16_t)packet_rx.payload[1] << 8);
+	tmp |= ((uint16_t)packet_rx.payload[0]);
+
+	return tmp;
+}
+
+/******************************************************************************
+*  \brief Packet payload convert to int16
+*
+*  \note
+******************************************************************************/
+int16_t packet_payload_int16(packet_rx_t packet_rx)
+{
+	int16_t tmp;
+
+	tmp = ((int16_t)packet_rx.payload[1] << 8);
+	tmp |= ((int16_t)packet_rx.payload[0]);
+
+	return tmp;
+}
+
+/******************************************************************************
+*  \brief Packet payload convert to uint32
+*
+*  \note
+******************************************************************************/
+uint32_t packet_payload_uint32(packet_rx_t packet_rx)
+{
+	uint32_t tmp;
+
+	tmp = ((uint32_t)packet_rx.payload[3] << 24);
+	tmp |= ((uint32_t)packet_rx.payload[2] << 16);
+	tmp |= ((uint32_t)packet_rx.payload[1] << 8);
+	tmp |= ((uint32_t)packet_rx.payload[0]);
+
+	return tmp;
+}
+
+/******************************************************************************
+*  \brief Packet payload convert to int32
+*
+*  \note
+******************************************************************************/
+int32_t packet_payload_int32(packet_rx_t packet_rx)
+{
+	int32_t tmp;
+
+	tmp = ((int32_t)packet_rx.payload[3] << 24);
+	tmp |= ((int32_t)packet_rx.payload[2] << 16);
+	tmp |= ((int32_t)packet_rx.payload[1] << 8);
+	tmp |= ((int32_t)packet_rx.payload[0]);
+
+	return tmp;
+}
+
+/******************************************************************************
+*  \brief Packet payload convert to uint64
+*
+*  \note
+******************************************************************************/
+uint64_t packet_payload_uint64(packet_rx_t packet_rx)
+{
+	uint64_t tmp;
+
+	tmp = ((uint64_t)packet_rx.payload[7] << 56);
+	tmp |= ((uint64_t)packet_rx.payload[6] << 48);
+	tmp |= ((uint64_t)packet_rx.payload[5] << 40);
+	tmp |= ((uint64_t)packet_rx.payload[4] << 32);
+	tmp |= ((uint64_t)packet_rx.payload[3] << 24);
+	tmp |= ((uint64_t)packet_rx.payload[2] << 16);
+	tmp |= ((uint64_t)packet_rx.payload[1] << 8);
+	tmp |= ((uint64_t)packet_rx.payload[0]);
+
+	return tmp;
+}
+
+/******************************************************************************
+*  \brief Packet payload convert to int64
+*
+*  \note
+******************************************************************************/
+int64_t packet_payload_int64(packet_rx_t packet_rx)
+{
+	int64_t tmp;
+
+	tmp = ((int64_t)packet_rx.payload[7] << 56);
+	tmp |= ((int64_t)packet_rx.payload[6] << 48);
+	tmp |= ((int64_t)packet_rx.payload[5] << 40);
+	tmp |= ((int64_t)packet_rx.payload[4] << 32);
+	tmp |= ((int64_t)packet_rx.payload[3] << 24);
+	tmp |= ((int64_t)packet_rx.payload[2] << 16);
+	tmp |= ((int64_t)packet_rx.payload[1] << 8);
+	tmp |= ((int64_t)packet_rx.payload[0]);
+
+	return tmp;
+}
+
+/******************************************************************************
+*  \brief Packet payload convert to float 32-bit
+*
+*  \note
+******************************************************************************/
+float packet_payload_float_32(packet_rx_t packet_rx)
+{
+	uint32_t uint32_data;
+	float float_data;
+
+	uint32_data = packet_payload_uint32(packet_rx);
+
+	/*Using pointer to get addr of data and reading it as float so not to use cast and convert*/
+	float_data = *(float *)&uint32_data;
+
+	return float_data;
+}
+
+/******************************************************************************
+*  \brief Packet payload convert to double 64-bit
+*
+*  \note
+******************************************************************************/
+double packet_payload_double_64(packet_rx_t packet_rx)
+{
+	uint64_t uint64_data;
+	double double_data;
+
+	uint64_data = packet_payload_uint64(packet_rx);
+
+	/*Using pointer to get addr of data and reading it as double so not to use cast and convert*/
+	double_data = *(double *)&uint64_data;
+
+	return double_data;
 }
 
 

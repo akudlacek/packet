@@ -419,15 +419,15 @@ int64_t packet_payload_int64(packet_rx_t packet_rx)
 ******************************************************************************/
 float packet_payload_float_32(packet_rx_t packet_rx)
 {
+	//use of a pointer to uint32_data is to avoid type punning
 	uint32_t uint32_data;
-	float float_data;
-
+	uint32_t *uint32_data_ptr;
+	
+	uint32_data_ptr = &uint32_data;
+	
 	uint32_data = packet_payload_uint32(packet_rx);
 
-	/*Using pointer to get addr of data and reading it as float so not to use cast and convert*/
-	float_data = *(float *)&uint32_data;
-
-	return float_data;
+	return *(float *)uint32_data_ptr;
 }
 
 /******************************************************************************
@@ -437,15 +437,15 @@ float packet_payload_float_32(packet_rx_t packet_rx)
 ******************************************************************************/
 double packet_payload_double_64(packet_rx_t packet_rx)
 {
+	//use of a pointer to uint32_data is to avoid type punning
 	uint64_t uint64_data;
-	double double_data;
-
+	uint64_t *uint64_data_ptr;
+	
+	uint64_data_ptr = &uint64_data;
+	
 	uint64_data = packet_payload_uint64(packet_rx);
 
-	/*Using pointer to get addr of data and reading it as double so not to use cast and convert*/
-	double_data = *(double *)&uint64_data;
-
-	return double_data;
+	return *(double *)uint64_data_ptr;
 }
 
 

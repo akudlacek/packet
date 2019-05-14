@@ -37,7 +37,6 @@ typedef enum
 *************************************************^************************************************/
 static int16_t default_rx_byte(void);
 static void default_tx_data(const uint8_t * const data, uint32_t length);
-static void default_command_handler(packet_inst_t * const packet_inst, packet_rx_t packet_rx);
 static void error_handler(packet_inst_t * const packet_inst, packet_error_t error);
 
 
@@ -54,7 +53,6 @@ void packet_get_config_defaults(packet_conf_t * const packet_conf)
 	packet_conf->tick_ms_ptr           = NULL;
 	packet_conf->rx_byte_fptr          = default_rx_byte;
 	packet_conf->tx_data_fprt          = default_tx_data;
-	packet_conf->cmd_handler_fptr      = (void *)default_command_handler;
 	packet_conf->crc_16_fptr           = sw_crc;
 	packet_conf->clear_buffer_timeout  = 0xFFFFFFFF;
 	packet_conf->enable                = PACKET_ENABLED;
@@ -70,7 +68,6 @@ void packet_init(packet_inst_t * const packet_inst, packet_conf_t packet_conf)
 	packet_inst->conf.tick_ms_ptr           = packet_conf.tick_ms_ptr;
 	packet_inst->conf.rx_byte_fptr          = packet_conf.rx_byte_fptr;
 	packet_inst->conf.tx_data_fprt          = packet_conf.tx_data_fprt;
-	packet_inst->conf.cmd_handler_fptr      = packet_conf.cmd_handler_fptr;
 	packet_inst->conf.crc_16_fptr           = packet_conf.crc_16_fptr;
 	packet_inst->conf.clear_buffer_timeout  = packet_conf.clear_buffer_timeout;
 	packet_inst->conf.enable                = packet_conf.enable;
@@ -79,9 +76,9 @@ void packet_init(packet_inst_t * const packet_inst, packet_conf_t packet_conf)
 /******************************************************************************
 *  \brief Packet task
 *
-*  \note
+*  \note takes pointer to instance and function pointer to command handler
 ******************************************************************************/
-void packet_task(packet_inst_t * const packet_inst)
+void packet_task(packet_inst_t * const packet_inst, void(*cmd_handler_fptr)(packet_inst_t *, packet_rx_t))
 {
 	/*If packet is disabled do not run*/
 	if(packet_inst->conf.enable == PACKET_DISABLED) return;
@@ -146,7 +143,7 @@ void packet_task(packet_inst_t * const packet_inst)
 					}
 					
 					/*Run command handler*/
-					packet_inst->conf.cmd_handler_fptr(packet_inst, packet_inst->packet_rx);
+					cmd_handler_fptr(packet_inst, packet_inst->packet_rx);
 				}
 				else
 				{
@@ -468,16 +465,6 @@ static int16_t default_rx_byte(void)
 *  \note
 ******************************************************************************/
 static void default_tx_data(const uint8_t * const data, uint32_t length)
-{
-	//empty
-}
-
-/******************************************************************************
-*  \brief Default command handler
-*
-*  \note
-******************************************************************************/
-static void default_command_handler(packet_inst_t * const packet_inst, packet_rx_t packet_rx)
 {
 	//empty
 }

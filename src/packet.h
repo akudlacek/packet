@@ -47,13 +47,6 @@ typedef	struct
 	const volatile uint32_t *tick_ms_ptr;                     //pointer to sys tick in mS
 	int16_t (*rx_byte_fptr)(void);                            //function pointer for received byte return -1 for no data or >=0 for valid data
 	void (*tx_data_fprt)(const uint8_t * const, uint32_t);    //function pointer for transmit, ptr to 8 bit data array and length
-	
-	/****!!!! Void ptr in field 1 is actually (packet_inst_t *),  !!!!****
-	 ****!!!! the reason for this is this type is within          !!!!****
-	 ****!!!! packet_inst_t and is not yet defined, I don't know  !!!!****
-	 ****!!!! of a better way to do this                          !!!!****/
-	void (*cmd_handler_fptr)(void *, packet_rx_t);            //function pointer for command handler
-	
 	uint16_t (*crc_16_fptr)(const uint8_t *, uint32_t);       //function pointer for crc-16, default will be sw_crc
 	uint32_t clear_buffer_timeout;                            //timeout for buffer to be cleared when incomplete packet received
 	packet_enable_t enable;                                   //enable or disable packet instance
@@ -78,7 +71,7 @@ typedef struct
 *************************************************^************************************************/
 void packet_get_config_defaults(packet_conf_t * const packet_conf);
 void packet_init(packet_inst_t * const packet_inst, packet_conf_t packet_conf);
-void packet_task(packet_inst_t * const packet_inst);
+void packet_task(packet_inst_t * const packet_inst, void(*cmd_handler_fptr)(packet_inst_t *, packet_rx_t));
 crc_t sw_crc(const uint8_t * const message, uint32_t num_bytes);
 void packet_tx_raw(packet_inst_t * const packet_inst, uint8_t id, const uint8_t * const data, uint8_t len);
 void packet_tx_8(packet_inst_t * const packet_inst, uint8_t id, uint8_t data);

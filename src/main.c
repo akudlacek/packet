@@ -94,7 +94,6 @@ int main(void)
 	/*Packet init*/
 	packet_get_config_defaults(&packet_conf);
 	packet_conf.tick_ms_ptr = sys_tick_ms_ptr;
-	packet_conf.cmd_handler_fptr = (void *)packet_cmd_handler;
 	//using built in crc-16
 	packet_conf.clear_buffer_timeout = PACKET_RX_TIMEOUT_MS;
 	packet_conf.enable = PACKET_ENABLED;
@@ -102,13 +101,11 @@ int main(void)
 	//a specific
 	packet_conf.rx_byte_fptr = a_rx_byte;
 	packet_conf.tx_data_fprt = a_tx_data;
-	packet_conf.cmd_handler_fptr = (void *)packet_cmd_handler;
 	packet_init(&a_packet_inst, packet_conf);
 
 	//b specific
 	packet_conf.rx_byte_fptr = b_rx_byte;
 	packet_conf.tx_data_fprt = b_tx_data;
-	packet_conf.cmd_handler_fptr = (void *)packet_cmd_handler;
 	packet_init(&b_packet_inst, packet_conf);
 
 	printf("hello\r\n");
@@ -117,15 +114,15 @@ int main(void)
 	{
 		sys_tick_ms = GetTickCount();
 
-		packet_task(&a_packet_inst);
-		packet_task(&b_packet_inst);
+		packet_task(&a_packet_inst, packet_cmd_handler);
+		packet_task(&b_packet_inst, packet_cmd_handler);
 
 		if((*sys_tick_ms_ptr - last_tick_ms) >= 100)
 		{
 			switch(id)
 			{
 				case 0:
-					packet_tx_raw(&a_packet_inst, id, str_val, (uint8_t)sizeof(str_val));
+					packet_tx_raw(&a_packet_inst, id, (uint8_t *)str_val, (uint8_t)sizeof(str_val));
 					break;
 				case 1:
 					packet_tx_8(&a_packet_inst, id, uint8_val);

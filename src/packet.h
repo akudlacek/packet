@@ -19,6 +19,14 @@
 #define MAX_PAYLOAD_LEN_BYTES 8
 #define RX_BUFFER_LEN_BYTES (MAX_PAYLOAD_LEN_BYTES + 4)
 
+#define PACKET_ERR_ID 0xFF
+
+//Packet errors payload (always one byte)
+typedef enum
+{
+	CHECKSUM_ERROR = 0x02
+} packet_error_t;
+
 /*Packet enable disable enum*/
 typedef enum
 {

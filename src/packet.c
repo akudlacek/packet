@@ -26,10 +26,6 @@
 /**************************************************************************************************
 *                                             DEFINES
 *************************************************^************************************************/
-typedef enum
-{
-	CHECKSUM_ERROR         = 0x02
-} packet_error_t;
 
 
 /**************************************************************************************************
@@ -480,5 +476,5 @@ static void error_handler(packet_inst_t * const packet_inst, packet_error_t erro
 	
 	data[0] = error;
 	
-	packet_tx_raw(packet_inst, 0xFF, data, 1);
+	packet_tx_raw(packet_inst, PACKET_ERR_ID, data, 1);
 }

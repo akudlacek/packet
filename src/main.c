@@ -27,7 +27,7 @@ static void b_tx_data(const uint8_t * const data, uint32_t length);
 
 static void packet_cmd_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx);
 static int rand_range(int min, int max);
-uint64_t rand_uint64_slow(void);
+static uint64_t rand_uint64_slow(void);
 
 
 /**************************************************************************************************
@@ -71,8 +71,12 @@ static double double_val;
 int main(void)
 {
 	uint32_t last_tick_ms;
+	uint32_t cmd_time_val_ms = 100;
 	packet_conf_t packet_conf;
 	uint8_t id = 0;
+
+	uint8_t i;
+	uint8_t tmp_data_arr[RX_BUFFER_LEN_BYTES];
 
 	uint8_val   = (uint8_t)rand_range(0, UINT8_MAX);
 	int8_val     = (int8_t)rand_range(INT8_MIN, INT8_MAX);
@@ -117,7 +121,8 @@ int main(void)
 		packet_task(&a_packet_inst, packet_cmd_handler);
 		packet_task(&b_packet_inst, packet_cmd_handler);
 
-		if((*sys_tick_ms_ptr - last_tick_ms) >= 100)
+		/*test tx, rx, encode, and decode*/
+		if((*sys_tick_ms_ptr - last_tick_ms) >= cmd_time_val_ms)
 		{
 			switch(id)
 			{
@@ -155,12 +160,57 @@ int main(void)
 					packet_tx_double_64(&a_packet_inst, id, double_val);
 					break;
 
+					//send packet with checksum error
+				case 11:
+					//Sends normal packet
+					packet_tx_double_64(&a_packet_inst, id, double_val);
+
+					//Retrieve that packet
+					for(i = 0; i < 12; i++)
+					{
+						tmp_data_arr[i] = (uint8_t)b_rx_byte();
+					}
+
+					//corrupt a byte
+					tmp_data_arr[(uint8_t)rand_range(0,11)] ^= 0xFF;
+
+					//put bad packet back
+					a_tx_data((uint8_t *)tmp_data_arr, 12);
+
+					break;
+
+					//send partial packet and ensure it times out
+				case 12:
+					//Sends normal packet
+					packet_tx_double_64(&a_packet_inst, id, double_val);
+
+					//Retrieve that packet
+					for(i = 0; i < 12; i++)
+					{
+						tmp_data_arr[i] = (uint8_t)b_rx_byte();
+					}
+
+					//put packet missing one byte back
+					a_tx_data((uint8_t *)tmp_data_arr, 11);
+
+					//set cmd send time to greater than timeout val
+					cmd_time_val_ms = b_packet_inst.conf.clear_buffer_timeout + 5;
+					break;
+
+				case 13:
+					//Sends normal packet
+					packet_tx_double_64(&a_packet_inst, id, double_val);
+					break;
+
 				default:
-					while(1);
 					break;
 			}
 
-			id++;
+			if(id <= 13)
+			{
+				id++;
+			}
+			
 
 			last_tick_ms = *sys_tick_ms_ptr;
 		}
@@ -300,6 +350,31 @@ static void packet_cmd_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx
 					successful = 1;
 				break;
 
+			case 11:
+					//id 11 should not get here because it should return an id of 0xFF for error
+					successful = 0;
+					printf("CHECKSUM ERROR FAIL\r\n");
+				break;
+
+			case 12:
+				//id 12 for timeout should not get here
+				successful = 0;
+				printf("TIMEOUT FAIL\r\n");
+				break;
+			case 13:
+				successful = 1;
+				printf("TIMEOUT PASS\r\n");
+				break;
+
+			case PACKET_ERR_ID:
+				//id 11 should return an error
+				if(packet_rx.payload[0] == CHECKSUM_ERROR)
+				{
+					successful = 1;
+					printf("CHECKSUM ERROR PASS\r\n");
+				}
+				break;
+
 			default:
 				printf("BAD ID ERROR ON A\r\n");
 				break;
@@ -320,7 +395,7 @@ static int rand_range(int min, int max)
 /******************************************************************************
 * 64 bit rand
 ******************************************************************************/
-uint64_t rand_uint64_slow(void)
+static uint64_t rand_uint64_slow(void)
 {
 	uint64_t r = 0;
 	for(int i = 0; i < 64; i++)

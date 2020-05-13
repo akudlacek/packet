@@ -32,8 +32,8 @@
 *                                         LOCAL PROTOTYPES
 *************************************************^************************************************/
 static int16_t default_rx_byte(void);
-static void default_tx_data(const uint8_t * const data, uint32_t length);
-static void error_handler(packet_inst_t * const packet_inst, packet_error_t error);
+static void    default_tx_data(const uint8_t * const data, const uint32_t length);
+static void    error_handler  (packet_inst_t * const packet_inst, const packet_error_t error);
 
 
 /**************************************************************************************************
@@ -59,7 +59,7 @@ void packet_get_config_defaults(packet_conf_t * const packet_conf)
 *
 *  \note
 ******************************************************************************/
-void packet_init(packet_inst_t * const packet_inst, packet_conf_t packet_conf)
+void packet_init(packet_inst_t * const packet_inst, const packet_conf_t packet_conf)
 {
 	packet_inst->conf.tick_ms_ptr           = packet_conf.tick_ms_ptr;
 	packet_inst->conf.rx_byte_fptr          = packet_conf.rx_byte_fptr;
@@ -74,7 +74,7 @@ void packet_init(packet_inst_t * const packet_inst, packet_conf_t packet_conf)
 *
 *  \note takes pointer to instance and function pointer to command handler
 ******************************************************************************/
-void packet_task(packet_inst_t * const packet_inst, void(*cmd_handler_fptr)(packet_inst_t *, packet_rx_t))
+void packet_task(packet_inst_t * const packet_inst, void(*cmd_handler_fptr)(packet_inst_t * const, const packet_rx_t))
 {
 	/*If packet is disabled do not run*/
 	if(packet_inst->conf.enable == PACKET_DISABLED) return;
@@ -168,7 +168,7 @@ void packet_task(packet_inst_t * const packet_inst, void(*cmd_handler_fptr)(pack
 *        CRC-16 (CRC-CCITT)
 *        Calculator: http://www.sunshine2k.de/coding/javascript/crc/crc_js.html
 ******************************************************************************/
-crc_t sw_crc(const uint8_t * const message, uint32_t num_bytes)
+crc_t sw_crc(const uint8_t * const message, const uint32_t num_bytes)
 {
 	crc_t remainder = 0;
 
@@ -202,7 +202,7 @@ crc_t sw_crc(const uint8_t * const message, uint32_t num_bytes)
 *
 *  \note
 ******************************************************************************/
-void packet_tx_raw(packet_inst_t * const packet_inst, uint8_t id, const uint8_t * const data, uint8_t len)
+void packet_tx_raw(packet_inst_t * const packet_inst, const uint8_t id, const uint8_t * const data, uint8_t len)
 {
 	/*If packet is disabled do not run*/
 	if(packet_inst->conf.enable == PACKET_DISABLED) return;
@@ -234,7 +234,7 @@ void packet_tx_raw(packet_inst_t * const packet_inst, uint8_t id, const uint8_t 
 *
 *  \note
 ******************************************************************************/
-void packet_tx_8(packet_inst_t * const packet_inst, uint8_t id, uint8_t data)
+void packet_tx_8(packet_inst_t * const packet_inst, const uint8_t id, const uint8_t data)
 {
 	packet_tx_raw(packet_inst, id, &data, 1);
 }
@@ -244,7 +244,7 @@ void packet_tx_8(packet_inst_t * const packet_inst, uint8_t id, uint8_t data)
 *
 *  \note
 ******************************************************************************/
-void packet_tx_16(packet_inst_t * const packet_inst, uint8_t id, uint16_t data)
+void packet_tx_16(packet_inst_t * const packet_inst, const uint8_t id, const uint16_t data)
 {
 	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 2);
 }
@@ -254,7 +254,7 @@ void packet_tx_16(packet_inst_t * const packet_inst, uint8_t id, uint16_t data)
 *
 *  \note
 ******************************************************************************/
-void packet_tx_32(packet_inst_t * const packet_inst, uint8_t id, uint32_t data)
+void packet_tx_32(packet_inst_t * const packet_inst, const uint8_t id, const uint32_t data)
 {
 	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 4);
 }
@@ -264,7 +264,7 @@ void packet_tx_32(packet_inst_t * const packet_inst, uint8_t id, uint32_t data)
 *
 *  \note
 ******************************************************************************/
-void packet_tx_64(packet_inst_t * const packet_inst, uint8_t id, uint64_t data)
+void packet_tx_64(packet_inst_t * const packet_inst, const uint8_t id, const uint64_t data)
 {
 	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 8);
 }
@@ -274,7 +274,7 @@ void packet_tx_64(packet_inst_t * const packet_inst, uint8_t id, uint64_t data)
 *
 *  \note
 ******************************************************************************/
-void packet_tx_float_32(packet_inst_t * const packet_inst, uint8_t id, float data)
+void packet_tx_float_32(packet_inst_t * const packet_inst, const uint8_t id, const float data)
 {
 	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 4);
 }
@@ -284,7 +284,7 @@ void packet_tx_float_32(packet_inst_t * const packet_inst, uint8_t id, float dat
 *
 *  \note
 ******************************************************************************/
-void packet_tx_double_64(packet_inst_t * const packet_inst, uint8_t id, double data)
+void packet_tx_double_64(packet_inst_t * const packet_inst, const uint8_t id, const double data)
 {
 	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 8);
 }
@@ -294,7 +294,7 @@ void packet_tx_double_64(packet_inst_t * const packet_inst, uint8_t id, double d
 *
 *  \note disables or enables packet task and packet_tx_raw
 ******************************************************************************/
-void packet_enable(packet_inst_t * const packet_inst, packet_enable_t enable)
+void packet_enable(packet_inst_t * const packet_inst, const packet_enable_t enable)
 {
 	packet_inst->conf.enable = enable;
 }
@@ -304,7 +304,7 @@ void packet_enable(packet_inst_t * const packet_inst, packet_enable_t enable)
 *
 *  \note
 ******************************************************************************/
-uint16_t packet_payload_uint16(packet_rx_t packet_rx)
+uint16_t packet_payload_uint16(const packet_rx_t packet_rx)
 {
 	uint16_t tmp;
 
@@ -319,7 +319,7 @@ uint16_t packet_payload_uint16(packet_rx_t packet_rx)
 *
 *  \note
 ******************************************************************************/
-int16_t packet_payload_int16(packet_rx_t packet_rx)
+int16_t packet_payload_int16(const packet_rx_t packet_rx)
 {
 	int16_t tmp;
 
@@ -334,7 +334,7 @@ int16_t packet_payload_int16(packet_rx_t packet_rx)
 *
 *  \note
 ******************************************************************************/
-uint32_t packet_payload_uint32(packet_rx_t packet_rx)
+uint32_t packet_payload_uint32(const packet_rx_t packet_rx)
 {
 	uint32_t tmp;
 
@@ -351,7 +351,7 @@ uint32_t packet_payload_uint32(packet_rx_t packet_rx)
 *
 *  \note
 ******************************************************************************/
-int32_t packet_payload_int32(packet_rx_t packet_rx)
+int32_t packet_payload_int32(const packet_rx_t packet_rx)
 {
 	int32_t tmp;
 
@@ -368,7 +368,7 @@ int32_t packet_payload_int32(packet_rx_t packet_rx)
 *
 *  \note
 ******************************************************************************/
-uint64_t packet_payload_uint64(packet_rx_t packet_rx)
+uint64_t packet_payload_uint64(const packet_rx_t packet_rx)
 {
 	uint64_t tmp;
 
@@ -389,7 +389,7 @@ uint64_t packet_payload_uint64(packet_rx_t packet_rx)
 *
 *  \note
 ******************************************************************************/
-int64_t packet_payload_int64(packet_rx_t packet_rx)
+int64_t packet_payload_int64(const packet_rx_t packet_rx)
 {
 	int64_t tmp;
 
@@ -410,7 +410,7 @@ int64_t packet_payload_int64(packet_rx_t packet_rx)
 *
 *  \note
 ******************************************************************************/
-float packet_payload_float_32(packet_rx_t packet_rx)
+float packet_payload_float_32(const packet_rx_t packet_rx)
 {
 	//use of a pointer to uint32_data is to avoid type punning
 	uint32_t uint32_data;
@@ -428,7 +428,7 @@ float packet_payload_float_32(packet_rx_t packet_rx)
 *
 *  \note
 ******************************************************************************/
-double packet_payload_double_64(packet_rx_t packet_rx)
+double packet_payload_double_64(const packet_rx_t packet_rx)
 {
 	//use of a pointer to uint32_data is to avoid type punning
 	uint64_t uint64_data;
@@ -460,7 +460,7 @@ static int16_t default_rx_byte(void)
 *
 *  \note
 ******************************************************************************/
-static void default_tx_data(const uint8_t * const data, uint32_t length)
+static void default_tx_data(const uint8_t * const data, const uint32_t length)
 {
 	//empty
 }
@@ -470,7 +470,7 @@ static void default_tx_data(const uint8_t * const data, uint32_t length)
 *
 *  \note
 ******************************************************************************/
-static void error_handler(packet_inst_t * const packet_inst, packet_error_t error)
+static void error_handler(packet_inst_t * const packet_inst, const packet_error_t error)
 {
 	uint8_t data[1];
 	

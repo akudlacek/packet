@@ -46,7 +46,7 @@ static void    error_handler  (packet_inst_t * const packet_inst, const packet_e
 ******************************************************************************/
 void packet_get_config_defaults(packet_conf_t * const packet_conf)
 {
-	packet_conf->tick_ms_ptr           = NULL;
+	packet_conf->tick_ptr              = NULL;
 	packet_conf->rx_byte_fptr          = default_rx_byte;
 	packet_conf->tx_data_fprt          = default_tx_data;
 	packet_conf->crc_16_fptr           = sw_crc;
@@ -61,12 +61,16 @@ void packet_get_config_defaults(packet_conf_t * const packet_conf)
 ******************************************************************************/
 void packet_init(packet_inst_t * const packet_inst, const packet_conf_t packet_conf)
 {
-	packet_inst->conf.tick_ms_ptr           = packet_conf.tick_ms_ptr;
-	packet_inst->conf.rx_byte_fptr          = packet_conf.rx_byte_fptr;
-	packet_inst->conf.tx_data_fprt          = packet_conf.tx_data_fprt;
-	packet_inst->conf.crc_16_fptr           = packet_conf.crc_16_fptr;
-	packet_inst->conf.clear_buffer_timeout  = packet_conf.clear_buffer_timeout;
-	packet_inst->conf.enable                = packet_conf.enable;
+	/*Conf*/
+	packet_inst->conf = packet_conf;
+	
+	/*Inst*/
+	packet_inst->rx_byte              = 0;
+	memset(packet_inst->rx_buffer, 0, sizeof(packet_inst->rx_buffer));
+	packet_inst->rx_buffer_ind        = 0;
+	packet_inst->calc_crc_16_checksum = 0;
+	memset(&packet_inst->packet_rx, 0, sizeof(packet_inst->packet_rx));
+	packet_inst->last_tick            = *packet_inst->conf.tick_ptr;
 }
 
 /******************************************************************************
@@ -86,7 +90,7 @@ void packet_task(packet_inst_t * const packet_inst, void(*cmd_handler_fptr)(pack
 	if(packet_inst->rx_byte != -1)
 	{
 		/*Record time of last byte*/
-		packet_inst->last_tick = *packet_inst->conf.tick_ms_ptr;
+		packet_inst->last_tick = *packet_inst->conf.tick_ptr;
 		
 		/*Check buffer limit*/
 		if(packet_inst->rx_buffer_ind >= RX_BUFFER_LEN_BYTES)
@@ -153,7 +157,7 @@ void packet_task(packet_inst_t * const packet_inst, void(*cmd_handler_fptr)(pack
 	}
 	
 	/*Clear buffer timeout*/
-	if((*packet_inst->conf.tick_ms_ptr - packet_inst->last_tick) >= packet_inst->conf.clear_buffer_timeout)
+	if((*packet_inst->conf.tick_ptr - packet_inst->last_tick) >= packet_inst->conf.clear_buffer_timeout)
 	{
 		/*Clear buffer*/
 		packet_inst->rx_buffer_ind = 0;

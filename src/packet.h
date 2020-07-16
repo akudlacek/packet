@@ -52,7 +52,7 @@ typedef struct packet_rx_t
 /*Packet configuration struct*/
 typedef	struct packet_conf_t
 {
-	const volatile uint32_t *tick_ms_ptr;                     //pointer to sys tick in mS
+	const volatile uint32_t *tick_ptr;                     //pointer to sys tick in mS
 	int16_t (*rx_byte_fptr)(void);                            //function pointer for received byte return -1 for no data or >=0 for valid data
 	void (*tx_data_fprt)(const uint8_t * const, uint32_t);    //function pointer for transmit, ptr to 8 bit data array and length
 	uint16_t (*crc_16_fptr)(const uint8_t * const, uint32_t); //function pointer for crc-16, default will be sw_crc

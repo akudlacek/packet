@@ -97,7 +97,7 @@ int main(void)
 
 	/*Packet init*/
 	packet_get_config_defaults(&packet_conf);
-	packet_conf.tick_ms_ptr = sys_tick_ms_ptr;
+	packet_conf.tick_ptr = sys_tick_ms_ptr;
 	//using built in crc-16
 	packet_conf.clear_buffer_timeout = PACKET_RX_TIMEOUT_MS;
 	packet_conf.enable = PACKET_ENABLED;

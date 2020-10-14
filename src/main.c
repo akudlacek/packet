@@ -20,13 +20,13 @@
 /**************************************************************************************************
 *                                         LOCAL PROTOTYPES
 *************************************************^************************************************/
-static int16_t a_rx_byte(void);
-static void a_tx_data(const uint8_t * const data, uint32_t length);
-static int16_t b_rx_byte(void);
-static void b_tx_data(const uint8_t * const data, uint32_t length);
+static int16_t  a_rx_byte(void);
+static void     a_tx_data(const uint8_t * const data, uint32_t length);
+static int16_t  b_rx_byte(void);
+static void     b_tx_data(const uint8_t * const data, uint32_t length);
 
-static void packet_cmd_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx);
-static int rand_range(int min, int max);
+static void     packet_cmd_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx);
+static int      rand_range(int min, int max);
 static uint64_t rand_uint64_slow(void);
 
 
@@ -45,17 +45,17 @@ static ring_buffer_t b_buff;
 static volatile uint8_t a_arr[1000];
 static volatile uint8_t b_arr[1000];
 
-static char str_val[] = "test";
-static uint8_t uint8_val;
-static int8_t int8_val;
+static char     str_val[] = "test";
+static uint8_t  uint8_val;
+static int8_t   int8_val;
 static uint16_t uint16_val;
-static int16_t int16_val;
+static int16_t  int16_val;
 static uint32_t uint32_val;
-static int32_t int32_val;
+static int32_t  int32_val;
 static uint64_t uint64_val;
-static int64_t int64_val;
-static float float_val;
-static double double_val;
+static int64_t  int64_val;
+static float    float_val;
+static double   double_val;
 
 
 /**************************************************************************************************
@@ -76,18 +76,18 @@ int main(void)
 	uint8_t i;
 	uint8_t tmp_data_arr[RX_BUFFER_LEN_BYTES];
 
-	uint8_val   = (uint8_t)rand_range(0, UINT8_MAX);
+	uint8_val    = (uint8_t)rand_range(0, UINT8_MAX);
 	int8_val     = (int8_t)rand_range(INT8_MIN, INT8_MAX);
-	uint16_val = (uint16_t)rand_range(0, UINT16_MAX);
-	int16_val   = (int16_t)rand_range(INT16_MIN, INT16_MAX);
-	uint32_val = (uint32_t)rand();
-	int32_val   = (int32_t)rand();
-	uint64_val = (uint64_t)rand_uint64_slow();
-	int64_val   = (int64_t)rand_uint64_slow();
-	float_val     = (float)10.123;
+	uint16_val   = (uint16_t)rand_range(0, UINT16_MAX);
+	int16_val    = (int16_t)rand_range(INT16_MIN, INT16_MAX);
+	uint32_val   = (uint32_t)rand();
+	int32_val    = (int32_t)rand();
+	uint64_val   = (uint64_t)rand_uint64_slow();
+	int64_val    = (int64_t)rand_uint64_slow();
+	float_val    = (float)10.123;
 	double_val   = (double)10.123456789;
 
-	sys_tick_ms = GetTickCount();
+	sys_tick_ms  = GetTickCount();
 	last_tick_ms = *sys_tick_ms_ptr;
 
 	ring_buffer_init(&a_buff, a_arr, sizeof(a_arr));

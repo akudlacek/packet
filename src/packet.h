@@ -3,7 +3,7 @@
  *
  * Created: 5/4/2018 3:52:27 PM
  *  Author: arin
- */ 
+ */
 
 
 #ifndef PACKET_H_
@@ -16,10 +16,22 @@
 /**************************************************************************************************
 *                                             DEFINES
 *************************************************^************************************************/
-#define MAX_PAYLOAD_LEN_BYTES 8
-#define RX_BUFFER_LEN_BYTES (MAX_PAYLOAD_LEN_BYTES + 4)
+/* If you want to override these symbols without modifying source code you will have to add a
+ * symbol definition in the preprocessor settings.
+ * In VS 2019        put DEFINE_OF_INTEREST=0 in [Configuration Properties->C/C++->Preprocessor->Preprocessor Definitions]
+ * In Atmel Studio 7 put DEFINE_OF_INTEREST=0 in [Properties->ARM/GNU C Compiler->Symbols->Defined symbols (-D)]
+ * In Code Blocks    put DEFINE_OF_INTEREST=0 in [Properties->Project's build options...->Compiler settings->#defines]
+ */
 
+#ifndef MAX_PAYLOAD_LEN_BYTES
+#define MAX_PAYLOAD_LEN_BYTES 8 //max of 255
+#endif
+
+#define RX_BUFFER_LEN_BYTES (MAX_PAYLOAD_LEN_BYTES + 4) /*the +4 is ID, SIZE, and two CHECKSUM bytes*/
+
+#ifndef PACKET_ERR_ID
 #define PACKET_ERR_ID 0xFF
+#endif
 
 //Packet errors payload (always one byte)
 typedef enum packet_error_t
@@ -52,7 +64,7 @@ typedef struct packet_rx_t
 /*Packet configuration struct*/
 typedef	struct packet_conf_t
 {
-	const volatile uint32_t *tick_ptr;                     //pointer to sys tick in mS
+	const volatile uint32_t *tick_ptr;                        //pointer to sys tick
 	int16_t (*rx_byte_fptr)(void);                            //function pointer for received byte return -1 for no data or >=0 for valid data
 	void (*tx_data_fprt)(const uint8_t * const, uint32_t);    //function pointer for transmit, ptr to 8 bit data array and length
 	uint16_t (*crc_16_fptr)(const uint8_t * const, uint32_t); //function pointer for crc-16, default will be sw_crc
@@ -64,10 +76,10 @@ typedef	struct packet_conf_t
 typedef struct packet_inst_t
 {
 	packet_conf_t conf;
-	
+
 	int16_t rx_byte;
 	uint8_t rx_buffer[RX_BUFFER_LEN_BYTES];
-	uint8_t rx_buffer_ind;
+	uint16_t rx_buffer_ind;
 	uint16_t calc_crc_16_checksum;
 	packet_rx_t packet_rx;
 	uint32_t last_tick;

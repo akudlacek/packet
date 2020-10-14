@@ -45,8 +45,6 @@ static ring_buffer_t b_buff;
 static volatile uint8_t a_arr[1000];
 static volatile uint8_t b_arr[1000];
 
-static uint8_t payload_sent[4];
-
 static char str_val[] = "test";
 static uint8_t uint8_val;
 static int8_t int8_val;
@@ -210,11 +208,11 @@ int main(void)
 			{
 				id++;
 			}
-			
+
 
 			last_tick_ms = *sys_tick_ms_ptr;
 		}
-		
+
 	}
 
 	return 0;

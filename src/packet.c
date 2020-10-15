@@ -19,7 +19,7 @@
 * PAYLOAD is LEN bytes
 *
 * NO DATA LEN=0: [ID:0, ID:1][LEN][CRC16:0, CRC16:1]
-*    DATA LEN>0: [ID:0, ID:1][LEN][PAYLOAD:0 ... PAYLOAD:n][CRC16:0, CRC16:1]
+*    DATA LEN>0: [ID:0, ID:1][LEN][PAYLOAD:0 ...,  PAYLOAD:n][CRC16:0, CRC16:1]
 */
 
 
@@ -30,13 +30,15 @@
 /**************************************************************************************************
 *                                             DEFINES
 *************************************************^************************************************/
-#define ID0_POSITION   0
-#define ID1_POSITION   1
-#define LEN_POSITION   2
-#define DATA0_POSITION 3
-#define DATA_N_POSITION(payload_data_len) (payload_data_len + DATA0_POSITION)
-#define CRC0_POSITION(payload_data_len)   (DATA_N_POSITION(payload_data_len) + 1)
-#define CRC1_POSITION(payload_data_len)   (CRC0_POSITION(payload_data_len) + 1)
+#define ID_0_POS   0
+#define ID_1_POS   1
+#define LEN_POS    2
+#define DATA_0_POS 3
+#define DATA_N_POS(payload_data_len) (payload_data_len + LEN_POS)
+#define CRC0_POS(payload_data_len)   (DATA_N_POS(payload_data_len) + 1)
+#define CRC1_POS(payload_data_len)   (CRC0_POS(payload_data_len) + 1)
+
+#define UNSERIALIZE_UINT16(msbyt, lsbyt) ( (((uint16_t)msbyt) << 8) | (uint16_t)lsbyt )
 
 
 /**************************************************************************************************
@@ -104,10 +106,10 @@ void packet_task(packet_inst_t * const packet_inst, void(*cmd_handler_fptr)(pack
 		packet_inst->last_tick = *packet_inst->conf.tick_ptr;
 
 		/*Is received buffer full?*/
-		if(packet_inst->rx_buffer_ind >= RX_BUFFER_LEN_BYTES)
+		if(packet_inst->rx_buffer_ind == RX_BUFFER_LEN_BYTES)
 		{
 			/*Set to the last byte*/
-			packet_inst->rx_buffer_ind = RX_BUFFER_LEN_BYTES - 1;
+			packet_inst->rx_buffer_ind -= 1;
 
 			/*Making it here means the received buffer is full*/
 		}
@@ -122,7 +124,7 @@ void packet_task(packet_inst_t * const packet_inst, void(*cmd_handler_fptr)(pack
 		if(packet_inst->rx_buffer_ind >= 3)
 		{
 			/*Copy LEN*/
-			packet_inst->packet_rx.len = packet_inst->rx_buffer[LEN_POSITION];
+			packet_inst->packet_rx.len = packet_inst->rx_buffer[LEN_POS];
 
 			/*Verify LEN*/
 			if(packet_inst->packet_rx.len > MAX_PAYLOAD_LEN_BYTES)
@@ -134,27 +136,27 @@ void packet_task(packet_inst_t * const packet_inst, void(*cmd_handler_fptr)(pack
 			/*Check data received to see if all bytes received - the +5 is [ID:0, ID:1][LEN][CRC16:0, CRC16:1]*/
 			if((packet_inst->packet_rx.len + 5) == packet_inst->rx_buffer_ind)
 			{
-				/*Calculate checksum - performed on [ID][LEN][DATA] if LEN=0 then just [ID][LEN]*/
+				/*Calculate checksum - performed on [ID:0, ID:1][LEN][PAYLOAD:0 ...,  PAYLOAD:n] if LEN=0 then just [ID:0, ID:1][LEN]*/
 				packet_inst->calc_crc_16_checksum = packet_inst->conf.crc_16_fptr(packet_inst->rx_buffer, (packet_inst->rx_buffer_ind - 2)); //subtract 2 bytes for [CRC16:0, CRC16:1]
 
 				/*Copy received CRC checksum*/
-				packet_inst->packet_rx.crc_16_checksum = ((uint16_t)(packet_inst->rx_buffer[CRC1_POSITION(packet_inst->packet_rx.len)] << 8) | (uint16_t)packet_inst->rx_buffer[CRC1_POSITION(packet_inst->packet_rx.len)]);
+				packet_inst->packet_rx.crc_16_checksum = UNSERIALIZE_UINT16(packet_inst->rx_buffer[CRC1_POS(packet_inst->packet_rx.len)], packet_inst->rx_buffer[CRC0_POS(packet_inst->packet_rx.len)]);
 
 				/*Check if calculated checksum matches received*/
 				if(packet_inst->calc_crc_16_checksum == packet_inst->packet_rx.crc_16_checksum)
 				{
 					/*Copy ID*/
-					packet_inst->packet_rx.id = ((uint16_t)packet_inst->rx_buffer[ID1_POSITION] << 8) | ((uint16_t)packet_inst->rx_buffer[ID0_POSITION]);
+					packet_inst->packet_rx.id = UNSERIALIZE_UINT16(packet_inst->rx_buffer[ID_1_POS], packet_inst->rx_buffer[ID_0_POS]);
 
 					/*Copy data - if data in packet*/
 					if(packet_inst->packet_rx.len > 0)
 					{
-						memcpy(packet_inst->packet_rx.payload, &packet_inst->rx_buffer[DATA0_POSITION], packet_inst->packet_rx.len);
+						memcpy(packet_inst->packet_rx.payload, &packet_inst->rx_buffer[DATA_0_POS], packet_inst->packet_rx.len);
 					}
 					/*Fill with zeros*/
 					else
 					{
-						memset(packet_inst->packet_rx.payload, 0, MAX_PAYLOAD_LEN_BYTES);
+						memset(packet_inst->packet_rx.payload, 0, sizeof(packet_inst->packet_rx.payload));
 					}
 
 					/*Run command handler*/
@@ -233,17 +235,17 @@ void packet_tx_raw(packet_inst_t * const packet_inst, const uint16_t id, const u
 	len = (len > MAX_PAYLOAD_LEN_BYTES ? MAX_PAYLOAD_LEN_BYTES : len);
 
 	/*Copy data to holding array*/
-	packet[0] = (uint8_t)id;
-	packet[1] = (uint8_t)(id >> 8);
-	packet[2] = len;
-	memcpy(&packet[3], data, len);
+	packet[ID_0_POS] = (uint8_t)id;
+	packet[ID_1_POS] = (uint8_t)(id >> 8);
+	packet[LEN_POS]  = len;
+	memcpy(&packet[DATA_0_POS], data, len);
 
 	/*Calc checksum*/
 	checksum = packet_inst->conf.crc_16_fptr(packet, (len + 3));
 
 	/*Copy checksum*/
-	packet[3+len] = (uint8_t)checksum;
-	packet[4+len] = (uint8_t)(checksum >> 8);
+	packet[CRC0_POS(len)] = (uint8_t)checksum;
+	packet[CRC1_POS(len)] = (uint8_t)(checksum >> 8);
 
 	/*TX packet*/
 	packet_inst->conf.tx_data_fprt(packet, len + 5);
@@ -326,12 +328,7 @@ void packet_enable(packet_inst_t * const packet_inst, const packet_enable_t enab
 ******************************************************************************/
 uint16_t packet_payload_uint16(const packet_rx_t packet_rx)
 {
-	uint16_t tmp;
-
-	tmp = ((uint16_t)packet_rx.payload[1] << 8);
-	tmp |= ((uint16_t)packet_rx.payload[0]);
-
-	return tmp;
+	return UNSERIALIZE_UINT16(packet_rx.payload[1], packet_rx.payload[0]);
 }
 
 /******************************************************************************

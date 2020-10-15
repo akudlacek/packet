@@ -8,14 +8,18 @@
 /*
 * Packet format:
 * Little endian meaning LSB sent first e.g 0x40CC is sent as 0xCC 0x40 same is expected for receive
-* 
+*
 * 0x12345678
 *   ^^    ^^
 *  MSB   LSB
 *  LAST  1ST
 *
-* NO DATA LEN=0: [ID][LEN][CRC16 on ID and LEN BYTE:0,BYTE:1]
-*    DATA LEN>0: [ID][LEN][BYTE:0 ... BYTE:n][CRC16 on ID, LEN, and DATA0..DATA:n BYTE:0,BYTE:1]
+* ID is 2 bytes
+* LEN is 1 byte
+* PAYLOAD is LEN bytes
+*
+* NO DATA LEN=0: [ID:0, ID:1][LEN][CRC16:0, CRC16:1]
+*    DATA LEN>0: [ID:0, ID:1][LEN][PAYLOAD:0 ... PAYLOAD:n][CRC16:0, CRC16:1]
 */
 
 
@@ -26,6 +30,13 @@
 /**************************************************************************************************
 *                                             DEFINES
 *************************************************^************************************************/
+#define ID0_POSITION   0
+#define ID1_POSITION   1
+#define LEN_POSITION   2
+#define DATA0_POSITION 3
+#define DATA_N_POSITION(payload_data_len) (payload_data_len + DATA0_POSITION)
+#define CRC0_POSITION(payload_data_len)   (DATA_N_POSITION(payload_data_len) + 1)
+#define CRC1_POSITION(payload_data_len)   (CRC0_POSITION(payload_data_len) + 1)
 
 
 /**************************************************************************************************
@@ -63,7 +74,7 @@ void packet_init(packet_inst_t * const packet_inst, const packet_conf_t packet_c
 {
 	/*Conf*/
 	packet_inst->conf = packet_conf;
-	
+
 	/*Inst*/
 	packet_inst->rx_byte              = 0;
 	memset(packet_inst->rx_buffer, 0, sizeof(packet_inst->rx_buffer));
@@ -82,66 +93,70 @@ void packet_task(packet_inst_t * const packet_inst, void(*cmd_handler_fptr)(pack
 {
 	/*If packet is disabled do not run*/
 	if(packet_inst->conf.enable == PACKET_DISABLED) return;
-	
+
 	/*Get byte*/
 	packet_inst->rx_byte = packet_inst->conf.rx_byte_fptr();
-	
+
 	/*Check for received byte*/
 	if(packet_inst->rx_byte != -1)
 	{
 		/*Record time of last byte*/
 		packet_inst->last_tick = *packet_inst->conf.tick_ptr;
-		
-		/*Check buffer limit*/
+
+		/*Is received buffer full?*/
 		if(packet_inst->rx_buffer_ind >= RX_BUFFER_LEN_BYTES)
 		{
 			/*Set to the last byte*/
 			packet_inst->rx_buffer_ind = RX_BUFFER_LEN_BYTES - 1;
+
+			/*Making it here means the received buffer is full*/
 		}
-		
-		/*Put received byte in buffer*/
-		packet_inst->rx_buffer[packet_inst->rx_buffer_ind] = (uint8_t)packet_inst->rx_byte;
-		packet_inst->rx_buffer_ind++;
-		
-		/*Check for valid packet - after ID and data length bytes received*/
-		if(packet_inst->rx_buffer_ind >= 2)
+		else
+        {
+            /*Put received byte in buffer*/
+            packet_inst->rx_buffer[packet_inst->rx_buffer_ind] = (uint8_t)packet_inst->rx_byte;
+            packet_inst->rx_buffer_ind++;
+        }
+
+		/*Check for valid packet - after ID:0 ID:1 and LEN bytes received*/
+		if(packet_inst->rx_buffer_ind >= 3)
 		{
 			/*Copy LEN*/
-			packet_inst->packet_rx.len = packet_inst->rx_buffer[1];
-			
-			/*Check to see if data length limit*/
+			packet_inst->packet_rx.len = packet_inst->rx_buffer[LEN_POSITION];
+
+			/*Verify LEN*/
 			if(packet_inst->packet_rx.len > MAX_PAYLOAD_LEN_BYTES)
 			{
-				/*Set to the max bytes*/
+				/*If not going to fit force it down to the max*/
 				packet_inst->packet_rx.len = MAX_PAYLOAD_LEN_BYTES;
 			}
-			
-			/*Check data received to see if all bytes received - the +4 is ID, SIZE, and two CHECKSUM bytes*/
-			if((packet_inst->packet_rx.len + 4) == packet_inst->rx_buffer_ind)
+
+			/*Check data received to see if all bytes received - the +5 is [ID:0, ID:1][LEN][CRC16:0, CRC16:1]*/
+			if((packet_inst->packet_rx.len + 5) == packet_inst->rx_buffer_ind)
 			{
 				/*Calculate checksum - performed on [ID][LEN][DATA] if LEN=0 then just [ID][LEN]*/
-				packet_inst->calc_crc_16_checksum = packet_inst->conf.crc_16_fptr(packet_inst->rx_buffer, (packet_inst->rx_buffer_ind - 2));
-				
+				packet_inst->calc_crc_16_checksum = packet_inst->conf.crc_16_fptr(packet_inst->rx_buffer, (packet_inst->rx_buffer_ind - 2)); //subtract 2 bytes for [CRC16:0, CRC16:1]
+
 				/*Copy received CRC checksum*/
-				packet_inst->packet_rx.crc_16_checksum = ((uint16_t)(packet_inst->rx_buffer[packet_inst->rx_buffer_ind - 1] << 8) | (uint16_t)packet_inst->rx_buffer[packet_inst->rx_buffer_ind - 2]);
-				
+				packet_inst->packet_rx.crc_16_checksum = ((uint16_t)(packet_inst->rx_buffer[CRC1_POSITION(packet_inst->packet_rx.len)] << 8) | (uint16_t)packet_inst->rx_buffer[CRC1_POSITION(packet_inst->packet_rx.len)]);
+
 				/*Check if calculated checksum matches received*/
 				if(packet_inst->calc_crc_16_checksum == packet_inst->packet_rx.crc_16_checksum)
 				{
 					/*Copy ID*/
-					packet_inst->packet_rx.id = packet_inst->rx_buffer[0];
-					
+					packet_inst->packet_rx.id = ((uint16_t)packet_inst->rx_buffer[ID1_POSITION] << 8) | ((uint16_t)packet_inst->rx_buffer[ID0_POSITION]);
+
 					/*Copy data - if data in packet*/
 					if(packet_inst->packet_rx.len > 0)
 					{
-						memcpy(packet_inst->packet_rx.payload, &packet_inst->rx_buffer[2], packet_inst->packet_rx.len);
+						memcpy(packet_inst->packet_rx.payload, &packet_inst->rx_buffer[DATA0_POSITION], packet_inst->packet_rx.len);
 					}
 					/*Fill with zeros*/
 					else
 					{
 						memset(packet_inst->packet_rx.payload, 0, MAX_PAYLOAD_LEN_BYTES);
 					}
-					
+
 					/*Run command handler*/
 					cmd_handler_fptr(packet_inst, packet_inst->packet_rx);
 				}
@@ -149,13 +164,13 @@ void packet_task(packet_inst_t * const packet_inst, void(*cmd_handler_fptr)(pack
 				{
 					error_handler(packet_inst, CHECKSUM_ERROR);
 				}
-				
+
 				/*Clear buffer*/
 				packet_inst->rx_buffer_ind = 0;
 			}
 		}
 	}
-	
+
 	/*Clear buffer timeout*/
 	if((*packet_inst->conf.tick_ptr - packet_inst->last_tick) >= packet_inst->conf.clear_buffer_timeout)
 	{
@@ -206,31 +221,32 @@ crc_t sw_crc(const uint8_t * const message, const uint32_t num_bytes)
 *
 *  \note
 ******************************************************************************/
-void packet_tx_raw(packet_inst_t * const packet_inst, const uint8_t id, const uint8_t * const data, uint8_t len)
+void packet_tx_raw(packet_inst_t * const packet_inst, const uint16_t id, const uint8_t * const data, uint8_t len)
 {
 	/*If packet is disabled do not run*/
 	if(packet_inst->conf.enable == PACKET_DISABLED) return;
-	
+
 	uint8_t packet[RX_BUFFER_LEN_BYTES];
 	uint16_t checksum;
-	
+
 	/*Limit len*/
 	len = (len > MAX_PAYLOAD_LEN_BYTES ? MAX_PAYLOAD_LEN_BYTES : len);
-	
+
 	/*Copy data to holding array*/
-	packet[0] = id;
-	packet[1] = len;
-	memcpy(&packet[2], data, len);
-	
+	packet[0] = (uint8_t)id;
+	packet[1] = (uint8_t)(id >> 8);
+	packet[2] = len;
+	memcpy(&packet[3], data, len);
+
 	/*Calc checksum*/
-	checksum = packet_inst->conf.crc_16_fptr(packet, (len + 2));
-	
+	checksum = packet_inst->conf.crc_16_fptr(packet, (len + 3));
+
 	/*Copy checksum*/
-	packet[2+len] = (uint8_t)checksum;
-	packet[3+len] = (uint8_t)(checksum >> 8);
-	
+	packet[3+len] = (uint8_t)checksum;
+	packet[4+len] = (uint8_t)(checksum >> 8);
+
 	/*TX packet*/
-	packet_inst->conf.tx_data_fprt(packet, len + 4);
+	packet_inst->conf.tx_data_fprt(packet, len + 5);
 }
 
 /******************************************************************************
@@ -238,7 +254,7 @@ void packet_tx_raw(packet_inst_t * const packet_inst, const uint8_t id, const ui
 *
 *  \note
 ******************************************************************************/
-void packet_tx_8(packet_inst_t * const packet_inst, const uint8_t id, const uint8_t data)
+void packet_tx_8(packet_inst_t * const packet_inst, const uint16_t id, const uint8_t data)
 {
 	packet_tx_raw(packet_inst, id, &data, 1);
 }
@@ -248,7 +264,7 @@ void packet_tx_8(packet_inst_t * const packet_inst, const uint8_t id, const uint
 *
 *  \note
 ******************************************************************************/
-void packet_tx_16(packet_inst_t * const packet_inst, const uint8_t id, const uint16_t data)
+void packet_tx_16(packet_inst_t * const packet_inst, const uint16_t id, const uint16_t data)
 {
 	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 2);
 }
@@ -258,7 +274,7 @@ void packet_tx_16(packet_inst_t * const packet_inst, const uint8_t id, const uin
 *
 *  \note
 ******************************************************************************/
-void packet_tx_32(packet_inst_t * const packet_inst, const uint8_t id, const uint32_t data)
+void packet_tx_32(packet_inst_t * const packet_inst, const uint16_t id, const uint32_t data)
 {
 	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 4);
 }
@@ -268,7 +284,7 @@ void packet_tx_32(packet_inst_t * const packet_inst, const uint8_t id, const uin
 *
 *  \note
 ******************************************************************************/
-void packet_tx_64(packet_inst_t * const packet_inst, const uint8_t id, const uint64_t data)
+void packet_tx_64(packet_inst_t * const packet_inst, const uint16_t id, const uint64_t data)
 {
 	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 8);
 }
@@ -278,7 +294,7 @@ void packet_tx_64(packet_inst_t * const packet_inst, const uint8_t id, const uin
 *
 *  \note
 ******************************************************************************/
-void packet_tx_float_32(packet_inst_t * const packet_inst, const uint8_t id, const float data)
+void packet_tx_float_32(packet_inst_t * const packet_inst, const uint16_t id, const float data)
 {
 	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 4);
 }
@@ -288,7 +304,7 @@ void packet_tx_float_32(packet_inst_t * const packet_inst, const uint8_t id, con
 *
 *  \note
 ******************************************************************************/
-void packet_tx_double_64(packet_inst_t * const packet_inst, const uint8_t id, const double data)
+void packet_tx_double_64(packet_inst_t * const packet_inst, const uint16_t id, const double data)
 {
 	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 8);
 }
@@ -419,9 +435,9 @@ float packet_payload_float_32(const packet_rx_t packet_rx)
 	//use of a pointer to uint32_data is to avoid type punning
 	uint32_t uint32_data;
 	uint32_t *uint32_data_ptr;
-	
+
 	uint32_data_ptr = &uint32_data;
-	
+
 	uint32_data = packet_payload_uint32(packet_rx);
 
 	return *(float *)uint32_data_ptr;
@@ -437,9 +453,9 @@ double packet_payload_double_64(const packet_rx_t packet_rx)
 	//use of a pointer to uint32_data is to avoid type punning
 	uint64_t uint64_data;
 	uint64_t *uint64_data_ptr;
-	
+
 	uint64_data_ptr = &uint64_data;
-	
+
 	uint64_data = packet_payload_uint64(packet_rx);
 
 	return *(double *)uint64_data_ptr;
@@ -477,8 +493,8 @@ static void default_tx_data(const uint8_t * const data, const uint32_t length)
 static void error_handler(packet_inst_t * const packet_inst, const packet_error_t error)
 {
 	uint8_t data[1];
-	
+
 	data[0] = error;
-	
+
 	packet_tx_raw(packet_inst, PACKET_ERR_ID, data, 1);
 }

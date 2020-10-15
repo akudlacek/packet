@@ -27,10 +27,10 @@
 #define MAX_PAYLOAD_LEN_BYTES 8 //max of 255
 #endif
 
-#define RX_BUFFER_LEN_BYTES (MAX_PAYLOAD_LEN_BYTES + 4) /*the +4 is ID, SIZE, and two CHECKSUM bytes*/
+#define RX_BUFFER_LEN_BYTES (MAX_PAYLOAD_LEN_BYTES + 5) /*the +5 is [ID:0, ID:1][LEN][CRC16:0, CRC16:1]*/
 
 #ifndef PACKET_ERR_ID
-#define PACKET_ERR_ID 0xFF
+#define PACKET_ERR_ID 0xFFFF
 #endif
 
 //Packet errors payload (always one byte)
@@ -55,7 +55,7 @@ typedef uint16_t crc_t; //The width of the CRC calculation and result. Modify th
 /*Packet received struct*/
 typedef struct packet_rx_t
 {
-	uint8_t id;
+	uint16_t id;
 	uint8_t len;
 	uint8_t payload[MAX_PAYLOAD_LEN_BYTES];
 	uint16_t crc_16_checksum;
@@ -93,13 +93,13 @@ void     packet_get_config_defaults(packet_conf_t * const packet_conf);
 void     packet_init               (packet_inst_t * const packet_inst, const packet_conf_t packet_conf);
 void     packet_task               (packet_inst_t * const packet_inst, void(*cmd_handler_fptr)(packet_inst_t * const, const packet_rx_t));
 crc_t    sw_crc                    (const uint8_t * const message, const uint32_t num_bytes);
-void     packet_tx_raw             (packet_inst_t * const packet_inst, const uint8_t id, const uint8_t * const data, const uint8_t len);
-void     packet_tx_8               (packet_inst_t * const packet_inst, const uint8_t id, const uint8_t data);
-void     packet_tx_16              (packet_inst_t * const packet_inst, const uint8_t id, const uint16_t data);
-void     packet_tx_32              (packet_inst_t * const packet_inst, const uint8_t id, const uint32_t data);
-void     packet_tx_64              (packet_inst_t * const packet_inst, const uint8_t id, const uint64_t data);
-void     packet_tx_float_32        (packet_inst_t * const packet_inst, const uint8_t id, const float data);
-void     packet_tx_double_64       (packet_inst_t * const packet_inst, const uint8_t id, const double data);
+void     packet_tx_raw             (packet_inst_t * const packet_inst, const uint16_t id, const uint8_t * const data, const uint8_t len);
+void     packet_tx_8               (packet_inst_t * const packet_inst, const uint16_t id, const uint8_t data);
+void     packet_tx_16              (packet_inst_t * const packet_inst, const uint16_t id, const uint16_t data);
+void     packet_tx_32              (packet_inst_t * const packet_inst, const uint16_t id, const uint32_t data);
+void     packet_tx_64              (packet_inst_t * const packet_inst, const uint16_t id, const uint64_t data);
+void     packet_tx_float_32        (packet_inst_t * const packet_inst, const uint16_t id, const float data);
+void     packet_tx_double_64       (packet_inst_t * const packet_inst, const uint16_t id, const double data);
 void     packet_enable             (packet_inst_t * const packet_inst, const packet_enable_t enable);
 uint16_t packet_payload_uint16     (const packet_rx_t packet_rx);
 int16_t  packet_payload_int16      (const packet_rx_t packet_rx);

@@ -71,7 +71,7 @@ int main(void)
 	uint32_t last_tick_ms;
 	uint32_t cmd_time_val_ms = 100;
 	packet_conf_t packet_conf;
-	uint32_t id = 1000;
+	uint32_t id = 0;
 
 	uint32_t i;
 	uint8_t tmp_data_arr[RX_BUFFER_LEN_BYTES];
@@ -125,9 +125,8 @@ int main(void)
 			switch(id)
 			{
 				/*Testing basic functions - BEGIN*/
-				case 1000:
+				case 0:
 					packet_tx_raw(&a_packet_inst, id, (uint8_t *)str_val, (uint8_t)sizeof(str_val));
-					id = 1;
 					break;
 				case 1:
 					packet_tx_8(&a_packet_inst, id, uint8_val);
@@ -225,7 +224,11 @@ int main(void)
 	
 	printf("TESTING FINISHED\r\n");
 
-	while(1);
+	while(1)
+	{
+		packet_task(&a_packet_inst, packet_cmd_handler);
+		packet_task(&b_packet_inst, packet_cmd_handler);
+	}
 
 	return 0;
 }
@@ -316,7 +319,7 @@ static void packet_cmd_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx
 	{
 		switch(packet_rx.id)
 		{
-			case 1000:
+			case 0:
 				if(memcmp(packet_rx.payload, str_val, sizeof(str_val)) == 0)
 					successful = 1;
 				break;

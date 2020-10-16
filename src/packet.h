@@ -29,15 +29,12 @@
 
 #define RX_BUFFER_LEN_BYTES (MAX_PAYLOAD_LEN_BYTES + 5) /*the +5 is [ID:0, ID:1][LEN][CRC16:0, CRC16:1]*/
 
-#ifndef PACKET_ERR_ID
-#define PACKET_ERR_ID 0xFFFF
-#endif
-
-//Packet errors payload (always one byte)
-typedef enum packet_error_t
+//Packet error IDs, these are reserved IDs
+typedef enum packet_id_err_t
 {
-	CHECKSUM_ERROR = 0x02
-} packet_error_t;
+	PCKT_ID_ERR_CHECKSUM = 0xFFFF,
+	PCKT_ID_ERR_TIMEOUT  = 0xFFFE
+} packet_id_err_t;
 
 /*Packet enable disable enum*/
 typedef enum packet_enable_t

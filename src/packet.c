@@ -46,7 +46,7 @@
 *************************************************^************************************************/
 static int16_t default_rx_byte(void);
 static void    default_tx_data(const uint8_t * const data, const uint32_t length);
-static void    error_handler  (packet_inst_t * const packet_inst, const packet_error_t error);
+static void    error_handler  (packet_inst_t * const packet_inst, const packet_id_err_t error);
 
 
 /**************************************************************************************************
@@ -164,7 +164,7 @@ void packet_task(packet_inst_t * const packet_inst, void(*cmd_handler_fptr)(pack
 				}
 				else
 				{
-					error_handler(packet_inst, CHECKSUM_ERROR);
+					error_handler(packet_inst, PCKT_ID_ERR_CHECKSUM);
 				}
 
 				/*Clear buffer*/
@@ -173,11 +173,13 @@ void packet_task(packet_inst_t * const packet_inst, void(*cmd_handler_fptr)(pack
 		}
 	}
 
-	/*Clear buffer timeout*/
-	if((*packet_inst->conf.tick_ptr - packet_inst->last_tick) >= packet_inst->conf.clear_buffer_timeout)
+	/*Clear buffer timeout if timeout has expired and there is data in the buffer*/
+	if(((*packet_inst->conf.tick_ptr - packet_inst->last_tick) >= packet_inst->conf.clear_buffer_timeout) && (packet_inst->rx_buffer_ind > 0))
 	{
 		/*Clear buffer*/
 		packet_inst->rx_buffer_ind = 0;
+
+		error_handler(packet_inst, PCKT_ID_ERR_TIMEOUT);
 	}
 }
 
@@ -485,13 +487,9 @@ static void default_tx_data(const uint8_t * const data, const uint32_t length)
 /******************************************************************************
 *  \brief Error handler
 *
-*  \note
+*  \note This sends a packet which contains no data bytes but the ID indicates the error
 ******************************************************************************/
-static void error_handler(packet_inst_t * const packet_inst, const packet_error_t error)
+static void error_handler(packet_inst_t * const packet_inst, const packet_id_err_t error)
 {
-	uint8_t data[1];
-
-	data[0] = error;
-
-	packet_tx_raw(packet_inst, PACKET_ERR_ID, data, 1);
+	packet_tx_raw(packet_inst, (uint16_t)error, 0, 0);
 }

@@ -71,9 +71,9 @@ int main(void)
 	uint32_t last_tick_ms;
 	uint32_t cmd_time_val_ms = 100;
 	packet_conf_t packet_conf;
-	uint8_t id = 0;
+	uint32_t id = 1000;
 
-	uint8_t i;
+	uint32_t i;
 	uint8_t tmp_data_arr[RX_BUFFER_LEN_BYTES];
 
 	uint8_val    = (uint8_t)rand_range(0, UINT8_MAX);
@@ -124,8 +124,10 @@ int main(void)
 		{
 			switch(id)
 			{
-				case 0:
+				/*Testing basic functions - BEGIN*/
+				case 1000:
 					packet_tx_raw(&a_packet_inst, id, (uint8_t *)str_val, (uint8_t)sizeof(str_val));
+					id = 1;
 					break;
 				case 1:
 					packet_tx_8(&a_packet_inst, id, uint8_val);
@@ -157,41 +159,43 @@ int main(void)
 				case 10:
 					packet_tx_double_64(&a_packet_inst, id, double_val);
 					break;
+				/*Testing basic functions - END*/
 
-					//send packet with checksum error
+				//send packet with checksum error
 				case 11:
+					//13 is the number of bytes in this packet
 					//Sends normal packet
 					packet_tx_double_64(&a_packet_inst, id, double_val);
 
 					//Retrieve that packet
-					for(i = 0; i < 12; i++)
+					for(i = 0; i < 13; i++)
 					{
 						tmp_data_arr[i] = (uint8_t)b_rx_byte();
 					}
 
 					//corrupt a byte
-					tmp_data_arr[(uint8_t)rand_range(0,11)] ^= 0xFF;
+					tmp_data_arr[(uint8_t)rand_range(0,12)] ^= 0xFF;
 
 					//put bad packet back
-					a_tx_data((uint8_t *)tmp_data_arr, 12);
-
+					a_tx_data((uint8_t *)tmp_data_arr, 13);
 					break;
 
-					//send partial packet and ensure it times out
+				//send partial packet and ensure it times out
 				case 12:
+					//13 is the number of bytes in this packet
 					//Sends normal packet
 					packet_tx_double_64(&a_packet_inst, id, double_val);
 
 					//Retrieve that packet
-					for(i = 0; i < 12; i++)
+					for(i = 0; i < 13; i++)
 					{
 						tmp_data_arr[i] = (uint8_t)b_rx_byte();
 					}
 
 					//put packet missing one byte back
-					a_tx_data((uint8_t *)tmp_data_arr, 11);
+					a_tx_data((uint8_t *)tmp_data_arr, 12);
 
-					//set cmd send time to greater than timeout val
+					//set cmd send time to greater than timeout val so the timeout can occur before next packet is sent thus causing a checksum error
 					cmd_time_val_ms = b_packet_inst.conf.clear_buffer_timeout + 5;
 					break;
 
@@ -208,12 +212,20 @@ int main(void)
 			{
 				id++;
 			}
+			else
+			{
+				break; //leave timed testing loop
+			}
 
 
 			last_tick_ms = *sys_tick_ms_ptr;
 		}
 
 	}
+	
+	printf("TESTING FINISHED\r\n");
+
+	while(1);
 
 	return 0;
 }
@@ -290,6 +302,7 @@ static void b_tx_data(const uint8_t * const data, uint32_t length)
 static void packet_cmd_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx)
 {
 	uint8_t successful = 0;
+	static uint16_t last_id;
 
 	//B recieved
 	if(packet_inst == &b_packet_inst)
@@ -303,7 +316,7 @@ static void packet_cmd_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx
 	{
 		switch(packet_rx.id)
 		{
-			case 0:
+			case 1000:
 				if(memcmp(packet_rx.payload, str_val, sizeof(str_val)) == 0)
 					successful = 1;
 				break;
@@ -349,27 +362,46 @@ static void packet_cmd_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx
 				break;
 
 			case 11:
-					//id 11 should not get here because it should return an id of 0xFF for error
-					successful = 0;
-					printf("CHECKSUM ERROR FAIL\r\n");
+				//id 11 should NOT get here
+				successful = 0;
+				printf("CHECKSUM FAIL ");
 				break;
 
 			case 12:
-				//id 12 for timeout should not get here
+				//id 12 should NOT get here
 				successful = 0;
-				printf("TIMEOUT FAIL\r\n");
-				break;
-			case 13:
-				successful = 1;
-				printf("TIMEOUT PASS\r\n");
+				printf("TIMEOUT FAIL ");
 				break;
 
-			case PACKET_ERR_ID:
-				//id 11 should return an error
-				if(packet_rx.payload[0] == CHECKSUM_ERROR)
-				{
+			case 13:
+				if(double_val == packet_payload_double_64(packet_rx))
 					successful = 1;
-					printf("CHECKSUM ERROR PASS\r\n");
+				break;
+
+			case PCKT_ID_ERR_CHECKSUM:
+				successful = 2;
+				if(last_id == 10)
+				{
+					//id 11 should return an error
+					printf("TEST: 11 SUCCESS\r\n");
+				}
+				else
+				{
+					printf("PCKT_ID_ERR_CHECKSUM UNKNOWN SOURCE\r\n");
+				}
+				break;
+
+			case PCKT_ID_ERR_TIMEOUT:
+				successful = 2;
+				if((last_id == 11) || (last_id == PCKT_ID_ERR_CHECKSUM))
+				{
+					//if last id was 11 then 11 failed test, if PCKT_ID_ERR_CHECKSUM was last then id 11 passed, FYI
+					//id 12 should return an error
+					printf("TEST: 12 SUCCESS\r\n");
+				}
+				else
+				{
+					printf("PCKT_ID_ERR_TIMEOUT UNKNOWN SOURCE\r\n");
 				}
 				break;
 
@@ -378,7 +410,13 @@ static void packet_cmd_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx
 				break;
 		}
 
-		printf("ID: %u %s\r\n", packet_rx.id, (successful == 1 ? "SUCCESS" : "FAIL"));
+		//if successful not 0 or 1 then message is handled in the case above
+		if(successful < 2)
+		{
+			printf("TEST: %u %s\r\n", packet_rx.id, (successful == 1 ? "SUCCESS" : "FAIL"));
+		}
+
+		last_id = packet_rx.id; //record last id to verify proper test response
 	}
 }
 

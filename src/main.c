@@ -4,8 +4,9 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
-
 #include <windows.h>
+#include <time.h>
+
 #include "./ring_buffer/ring_buffer.h"
 
 #include "packet.h"
@@ -26,7 +27,7 @@ static int16_t  b_rx_byte(void);
 static void     b_tx_data(const uint8_t * const data, uint32_t length);
 
 static void     packet_cmd_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx);
-static int      rand_range(int min, int max);
+static uint64_t rand_range(uint64_t min, uint64_t max);
 static uint64_t rand_uint64_slow(void);
 
 
@@ -76,16 +77,19 @@ int main(void)
 	uint32_t i;
 	uint8_t tmp_data_arr[RX_BUFFER_LEN_BYTES];
 
+	/* initialize random seed: */
+	srand((unsigned int)time(NULL));
+
 	uint8_val    = (uint8_t)rand_range(0, UINT8_MAX);
 	int8_val     = (int8_t)rand_range(INT8_MIN, INT8_MAX);
 	uint16_val   = (uint16_t)rand_range(0, UINT16_MAX);
 	int16_val    = (int16_t)rand_range(INT16_MIN, INT16_MAX);
-	uint32_val   = (uint32_t)rand();
-	int32_val    = (int32_t)rand();
+	uint32_val   = (uint32_t)rand_range(0, UINT32_MAX);
+	int32_val    = (int32_t)rand_range(INT32_MIN, INT32_MAX);
 	uint64_val   = (uint64_t)rand_uint64_slow();
 	int64_val    = (int64_t)rand_uint64_slow();
-	float_val    = (float)10.123;
-	double_val   = (double)10.123456789;
+	float_val    = (float)rand()/(float)rand_range(1, UINT16_MAX);
+	double_val   = (double)rand()/(double)rand_range(1, UINT16_MAX);
 
 	sys_tick_ms  = GetTickCount();
 	last_tick_ms = *sys_tick_ms_ptr;
@@ -198,16 +202,31 @@ int main(void)
 					cmd_time_val_ms = b_packet_inst.conf.clear_buffer_timeout + 5;
 					break;
 
-				case 13:
 					//Sends normal packet
+				case 13:
+					
 					packet_tx_double_64(&a_packet_inst, id, double_val);
+					break;
+
+					//send example packet
+				case 14: 
+					/* Example:
+					* ID = 0xDEAD
+					* LEN = 2
+					* PAYLOAD = 0xBEEF
+					* CRC = 0x7419
+					* 
+					* Packet sent
+					*  0   1   2   3   4   5   6
+					* [DE][AD][02][BE][EF][74][19] */
+					packet_tx_16(&a_packet_inst, 0xDEAD, 0xBEEF);
 					break;
 
 				default:
 					break;
 			}
 
-			if(id <= 13)
+			if(id <= 14)
 			{
 				id++;
 			}
@@ -381,6 +400,11 @@ static void packet_cmd_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx
 					successful = 1;
 				break;
 
+			case 0xDEAD:
+				if(packet_rx.len == 2 && packet_payload_uint16(packet_rx) == 0xBEEF && packet_rx.crc_16_checksum == 0x7419)
+					successful = 1;
+				break;
+
 			case PCKT_ID_ERR_CHECKSUM:
 				successful = 2;
 				if(last_id == 10)
@@ -426,7 +450,7 @@ static void packet_cmd_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx
 /******************************************************************************
 * Generates random number within a range
 ******************************************************************************/
-static int rand_range(int min, int max)
+static uint64_t rand_range(uint64_t min, uint64_t max)
 {
 	return rand() % (max - min + 1) + min;
 }

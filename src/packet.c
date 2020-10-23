@@ -7,19 +7,29 @@
 
 /*
 * Packet format:
-* Little endian meaning LSB sent first e.g 0x40CC is sent as 0xCC 0x40 same is expected for receive
+* Big endian meaning most significant byte sent first e.g 0x40CC is sent as 0x40 0xCC
 *
 * 0x12345678
 *   ^^    ^^
-*  MSB   LSB
-*  LAST  1ST
+* MSByte LSByte
+*  1st    Last
 *
 * ID is 2 bytes
 * LEN is 1 byte
 * PAYLOAD is LEN bytes
 *
-* NO DATA LEN=0: [ID:0, ID:1][LEN][CRC16:0, CRC16:1]
-*    DATA LEN>0: [ID:0, ID:1][LEN][PAYLOAD:0 ...,  PAYLOAD:n][CRC16:0, CRC16:1]
+* NO DATA LEN=0: [ID:1, ID:0][LEN][CRC16:1, CRC16:0]
+*    DATA LEN>0: [ID:1, ID:0][LEN][PAYLOAD:n, ...,  PAYLOAD:0][CRC16:1, CRC16:0]
+* 
+* Example:
+* ID = 0xDEAD
+* LEN = 2
+* PAYLOAD = 0xBEEF
+* CRC = 0x7419
+* 
+* Packet sent
+*  0   1   2   3   4   5   6
+* [DE][AD][02][BE][EF][74][19]
 */
 
 
@@ -30,13 +40,13 @@
 /**************************************************************************************************
 *                                             DEFINES
 *************************************************^************************************************/
-#define ID_0_POS   0
-#define ID_1_POS   1
+#define ID_1_POS   0
+#define ID_0_POS   1
 #define LEN_POS    2
-#define DATA_0_POS 3
-#define DATA_N_POS(payload_data_len) (payload_data_len + LEN_POS)
-#define CRC0_POS(payload_data_len)   (DATA_N_POS(payload_data_len) + 1)
-#define CRC1_POS(payload_data_len)   (CRC0_POS(payload_data_len) + 1)
+#define DATA_N_POS 3
+#define DATA_0_POS(payload_data_len) (payload_data_len + LEN_POS)
+#define CRC1_POS(payload_data_len)   (DATA_0_POS(payload_data_len) + 1)
+#define CRC0_POS(payload_data_len)   (CRC1_POS(payload_data_len) + 1)
 
 #define UNSERIALIZE_UINT16(msbyt, lsbyt) ( (((uint16_t)msbyt) << 8) | (uint16_t)lsbyt )
 
@@ -47,6 +57,7 @@
 static int16_t default_rx_byte(void);
 static void    default_tx_data(const uint8_t * const data, const uint32_t length);
 static void    error_handler  (packet_inst_t * const packet_inst, const packet_id_err_t error);
+static void *  revmemcpy      (void* dest, const void* src, size_t len);
 
 
 /**************************************************************************************************
@@ -151,7 +162,7 @@ void packet_task(packet_inst_t * const packet_inst, void(*cmd_handler_fptr)(pack
 					/*Copy data - if data in packet*/
 					if(packet_inst->packet_rx.len > 0)
 					{
-						memcpy(packet_inst->packet_rx.payload, &packet_inst->rx_buffer[DATA_0_POS], packet_inst->packet_rx.len);
+						revmemcpy(packet_inst->packet_rx.payload, &packet_inst->rx_buffer[DATA_N_POS], packet_inst->packet_rx.len);
 					}
 					/*Fill with zeros*/
 					else
@@ -227,27 +238,29 @@ crc_t sw_crc(const uint8_t * const message, const uint32_t num_bytes)
 ******************************************************************************/
 void packet_tx_raw(packet_inst_t * const packet_inst, const uint16_t id, const uint8_t * const data, uint8_t len)
 {
-	/*If packet is disabled do not run*/
-	if(packet_inst->conf.enable == PACKET_DISABLED) return;
-
+	uint16_t i;
 	uint8_t packet[RX_BUFFER_LEN_BYTES];
 	uint16_t checksum;
+
+	/*If packet is disabled do not run*/
+	if(packet_inst->conf.enable == PACKET_DISABLED) return;
 
 	/*Limit len*/
 	len = (len > MAX_PAYLOAD_LEN_BYTES ? MAX_PAYLOAD_LEN_BYTES : len);
 
 	/*Copy data to holding array*/
-	packet[ID_0_POS] = (uint8_t)id;
 	packet[ID_1_POS] = (uint8_t)(id >> 8);
+	packet[ID_0_POS] = (uint8_t)id;
 	packet[LEN_POS]  = len;
-	memcpy(&packet[DATA_0_POS], data, len);
+	
+	revmemcpy(&packet[DATA_N_POS], data, len);
 
 	/*Calc checksum*/
 	checksum = packet_inst->conf.crc_16_fptr(packet, (len + 3));
 
 	/*Copy checksum*/
-	packet[CRC0_POS(len)] = (uint8_t)checksum;
 	packet[CRC1_POS(len)] = (uint8_t)(checksum >> 8);
+	packet[CRC0_POS(len)] = (uint8_t)checksum;
 
 	/*TX packet*/
 	packet_inst->conf.tx_data_fprt(packet, len + 5);
@@ -492,4 +505,20 @@ static void default_tx_data(const uint8_t * const data, const uint32_t length)
 static void error_handler(packet_inst_t * const packet_inst, const packet_id_err_t error)
 {
 	packet_tx_raw(packet_inst, (uint16_t)error, 0, 0);
+}
+
+/******************************************************************************
+*  \brief reverse memory copy
+*
+*  \note used to invert endianness
+******************************************************************************/
+static void * revmemcpy(void *dest, const void *src, size_t len)
+{
+	uint8_t *d = (uint8_t *)dest + len - 1;
+	const uint8_t *s = src;
+
+	while(len--)
+		*d-- = *s++;
+
+	return dest;
 }

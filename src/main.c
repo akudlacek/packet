@@ -204,18 +204,18 @@ int main(void)
 
 					//Sends normal packet
 				case 13:
-					
+
 					packet_tx_double_64(&a_packet_inst, id, double_val);
 					break;
 
 					//send example packet
-				case 14: 
+				case 14:
 					/* Example:
 					* ID = 0xDEAD
 					* LEN = 2
 					* PAYLOAD = 0xBEEF
 					* CRC = 0x7419
-					* 
+					*
 					* Packet sent
 					*  0   1   2   3   4   5   6
 					* [DE][AD][02][BE][EF][74][19] */
@@ -240,7 +240,7 @@ int main(void)
 		}
 
 	}
-	
+
 	printf("TESTING FINISHED\r\n");
 
 	while(1)
@@ -326,14 +326,14 @@ static void packet_cmd_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx
 	uint8_t successful = 0;
 	static uint16_t last_id;
 
-	//B recieved
+	//B received
 	if(packet_inst == &b_packet_inst)
 	{
 		//echo back to a
 		packet_tx_raw(&b_packet_inst, packet_rx.id, packet_rx.payload, packet_rx.len);
 	}
 
-	//A recieved
+	//A received
 	else if(packet_inst == &a_packet_inst)
 	{
 		switch(packet_rx.id)

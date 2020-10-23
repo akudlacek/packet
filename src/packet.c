@@ -20,13 +20,13 @@
 *
 * NO DATA LEN=0: [ID:1, ID:0][LEN][CRC16:1, CRC16:0]
 *    DATA LEN>0: [ID:1, ID:0][LEN][PAYLOAD:n, ...,  PAYLOAD:0][CRC16:1, CRC16:0]
-* 
+*
 * Example:
 * ID = 0xDEAD
 * LEN = 2
 * PAYLOAD = 0xBEEF
 * CRC = 0x7419
-* 
+*
 * Packet sent
 *  0   1   2   3   4   5   6
 * [DE][AD][02][BE][EF][74][19]
@@ -54,10 +54,16 @@
 /**************************************************************************************************
 *                                         LOCAL PROTOTYPES
 *************************************************^************************************************/
-static int16_t default_rx_byte(void);
-static void    default_tx_data(const uint8_t * const data, const uint32_t length);
-static void    error_handler  (packet_inst_t * const packet_inst, const packet_id_err_t error);
-static void *  revmemcpy      (void* dest, const void* src, size_t len);
+static int16_t  default_rx_byte(void);
+static void     default_tx_data(const uint8_t * const data, const uint32_t length);
+static void     error_handler  (packet_inst_t * const packet_inst, const packet_id_err_t error);
+static void *   revmemcpy      (void* dest, const void* src, size_t len);
+static uint16_t unsr_16        (const uint8_t * const big_endian_data);
+static uint32_t unsr_32        (const uint8_t * const big_endian_data);
+static uint64_t unsr_64        (const uint8_t * const big_endian_data);
+static void     sr_16          (uint8_t * const dest, const uint16_t src);
+static void     sr_32          (uint8_t * const dest, const uint32_t src);
+static void     sr_64          (uint8_t * const dest, const uint64_t src);
 
 
 /**************************************************************************************************
@@ -162,7 +168,7 @@ void packet_task(packet_inst_t * const packet_inst, void(*cmd_handler_fptr)(pack
 					/*Copy data - if data in packet*/
 					if(packet_inst->packet_rx.len > 0)
 					{
-						revmemcpy(packet_inst->packet_rx.payload, &packet_inst->rx_buffer[DATA_N_POS], packet_inst->packet_rx.len);
+						memcpy(packet_inst->packet_rx.payload, &packet_inst->rx_buffer[DATA_N_POS], packet_inst->packet_rx.len);
 					}
 					/*Fill with zeros*/
 					else
@@ -238,7 +244,6 @@ crc_t sw_crc(const uint8_t * const message, const uint32_t num_bytes)
 ******************************************************************************/
 void packet_tx_raw(packet_inst_t * const packet_inst, const uint16_t id, const uint8_t * const data, uint8_t len)
 {
-	uint16_t i;
 	uint8_t packet[RX_BUFFER_LEN_BYTES];
 	uint16_t checksum;
 
@@ -252,8 +257,8 @@ void packet_tx_raw(packet_inst_t * const packet_inst, const uint16_t id, const u
 	packet[ID_1_POS] = (uint8_t)(id >> 8);
 	packet[ID_0_POS] = (uint8_t)id;
 	packet[LEN_POS]  = len;
-	
-	revmemcpy(&packet[DATA_N_POS], data, len);
+
+	memcpy(&packet[DATA_N_POS], data, len);
 
 	/*Calc checksum*/
 	checksum = packet_inst->conf.crc_16_fptr(packet, (len + 3));
@@ -273,7 +278,7 @@ void packet_tx_raw(packet_inst_t * const packet_inst, const uint16_t id, const u
 ******************************************************************************/
 void packet_tx_8(packet_inst_t * const packet_inst, const uint16_t id, const uint8_t data)
 {
-	packet_tx_raw(packet_inst, id, &data, 1);
+	packet_tx_raw(packet_inst, id, &data, sizeof(data));
 }
 
 /******************************************************************************
@@ -283,7 +288,10 @@ void packet_tx_8(packet_inst_t * const packet_inst, const uint16_t id, const uin
 ******************************************************************************/
 void packet_tx_16(packet_inst_t * const packet_inst, const uint16_t id, const uint16_t data)
 {
-	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 2);
+    uint8_t tmp[sizeof(data)];
+
+    sr_16(tmp, data);
+	packet_tx_raw(packet_inst, id, tmp, sizeof(data));
 }
 
 /******************************************************************************
@@ -293,7 +301,10 @@ void packet_tx_16(packet_inst_t * const packet_inst, const uint16_t id, const ui
 ******************************************************************************/
 void packet_tx_32(packet_inst_t * const packet_inst, const uint16_t id, const uint32_t data)
 {
-	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 4);
+    uint8_t tmp[sizeof(data)];
+
+    sr_32(tmp, data);
+	packet_tx_raw(packet_inst, id, tmp, sizeof(data));
 }
 
 /******************************************************************************
@@ -303,7 +314,10 @@ void packet_tx_32(packet_inst_t * const packet_inst, const uint16_t id, const ui
 ******************************************************************************/
 void packet_tx_64(packet_inst_t * const packet_inst, const uint16_t id, const uint64_t data)
 {
-	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 8);
+    uint8_t tmp[sizeof(data)];
+
+    sr_64(tmp, data);
+	packet_tx_raw(packet_inst, id, tmp, sizeof(data));
 }
 
 /******************************************************************************
@@ -313,7 +327,10 @@ void packet_tx_64(packet_inst_t * const packet_inst, const uint16_t id, const ui
 ******************************************************************************/
 void packet_tx_float_32(packet_inst_t * const packet_inst, const uint16_t id, const float data)
 {
-	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 4);
+    uint8_t tmp[sizeof(data)];
+
+    sr_32(tmp, (uint32_t)data);
+	packet_tx_raw(packet_inst, id, tmp, sizeof(data));
 }
 
 /******************************************************************************
@@ -323,7 +340,10 @@ void packet_tx_float_32(packet_inst_t * const packet_inst, const uint16_t id, co
 ******************************************************************************/
 void packet_tx_double_64(packet_inst_t * const packet_inst, const uint16_t id, const double data)
 {
-	packet_tx_raw(packet_inst, id, (uint8_t*)&data, 8);
+    uint8_t tmp[sizeof(data)];
+
+    sr_64(tmp, (uint64_t)data);
+	packet_tx_raw(packet_inst, id, tmp, sizeof(data));
 }
 
 /******************************************************************************
@@ -343,7 +363,7 @@ void packet_enable(packet_inst_t * const packet_inst, const packet_enable_t enab
 ******************************************************************************/
 uint16_t packet_payload_uint16(const packet_rx_t packet_rx)
 {
-	return UNSERIALIZE_UINT16(packet_rx.payload[1], packet_rx.payload[0]);
+	return unsr_16(packet_rx.payload);
 }
 
 /******************************************************************************
@@ -353,12 +373,7 @@ uint16_t packet_payload_uint16(const packet_rx_t packet_rx)
 ******************************************************************************/
 int16_t packet_payload_int16(const packet_rx_t packet_rx)
 {
-	int16_t tmp;
-
-	tmp = ((int16_t)packet_rx.payload[1] << 8);
-	tmp |= ((int16_t)packet_rx.payload[0]);
-
-	return tmp;
+	return (int16_t)unsr_16(packet_rx.payload);
 }
 
 /******************************************************************************
@@ -368,14 +383,7 @@ int16_t packet_payload_int16(const packet_rx_t packet_rx)
 ******************************************************************************/
 uint32_t packet_payload_uint32(const packet_rx_t packet_rx)
 {
-	uint32_t tmp;
-
-	tmp = ((uint32_t)packet_rx.payload[3] << 24);
-	tmp |= ((uint32_t)packet_rx.payload[2] << 16);
-	tmp |= ((uint32_t)packet_rx.payload[1] << 8);
-	tmp |= ((uint32_t)packet_rx.payload[0]);
-
-	return tmp;
+	return unsr_32(packet_rx.payload);
 }
 
 /******************************************************************************
@@ -385,14 +393,7 @@ uint32_t packet_payload_uint32(const packet_rx_t packet_rx)
 ******************************************************************************/
 int32_t packet_payload_int32(const packet_rx_t packet_rx)
 {
-	int32_t tmp;
-
-	tmp = ((int32_t)packet_rx.payload[3] << 24);
-	tmp |= ((int32_t)packet_rx.payload[2] << 16);
-	tmp |= ((int32_t)packet_rx.payload[1] << 8);
-	tmp |= ((int32_t)packet_rx.payload[0]);
-
-	return tmp;
+	return (int32_t)unsr_32(packet_rx.payload);
 }
 
 /******************************************************************************
@@ -402,18 +403,7 @@ int32_t packet_payload_int32(const packet_rx_t packet_rx)
 ******************************************************************************/
 uint64_t packet_payload_uint64(const packet_rx_t packet_rx)
 {
-	uint64_t tmp;
-
-	tmp = ((uint64_t)packet_rx.payload[7] << 56);
-	tmp |= ((uint64_t)packet_rx.payload[6] << 48);
-	tmp |= ((uint64_t)packet_rx.payload[5] << 40);
-	tmp |= ((uint64_t)packet_rx.payload[4] << 32);
-	tmp |= ((uint64_t)packet_rx.payload[3] << 24);
-	tmp |= ((uint64_t)packet_rx.payload[2] << 16);
-	tmp |= ((uint64_t)packet_rx.payload[1] << 8);
-	tmp |= ((uint64_t)packet_rx.payload[0]);
-
-	return tmp;
+	return unsr_64(packet_rx.payload);
 }
 
 /******************************************************************************
@@ -423,18 +413,7 @@ uint64_t packet_payload_uint64(const packet_rx_t packet_rx)
 ******************************************************************************/
 int64_t packet_payload_int64(const packet_rx_t packet_rx)
 {
-	int64_t tmp;
-
-	tmp = ((int64_t)packet_rx.payload[7] << 56);
-	tmp |= ((int64_t)packet_rx.payload[6] << 48);
-	tmp |= ((int64_t)packet_rx.payload[5] << 40);
-	tmp |= ((int64_t)packet_rx.payload[4] << 32);
-	tmp |= ((int64_t)packet_rx.payload[3] << 24);
-	tmp |= ((int64_t)packet_rx.payload[2] << 16);
-	tmp |= ((int64_t)packet_rx.payload[1] << 8);
-	tmp |= ((int64_t)packet_rx.payload[0]);
-
-	return tmp;
+	return (int64_t)unsr_64(packet_rx.payload);
 }
 
 /******************************************************************************
@@ -444,15 +423,7 @@ int64_t packet_payload_int64(const packet_rx_t packet_rx)
 ******************************************************************************/
 float packet_payload_float_32(const packet_rx_t packet_rx)
 {
-	//use of a pointer to uint32_data is to avoid type punning
-	uint32_t uint32_data;
-	uint32_t *uint32_data_ptr;
-
-	uint32_data_ptr = &uint32_data;
-
-	uint32_data = packet_payload_uint32(packet_rx);
-
-	return *(float *)uint32_data_ptr;
+	return (float)unsr_32(packet_rx.payload);
 }
 
 /******************************************************************************
@@ -462,15 +433,7 @@ float packet_payload_float_32(const packet_rx_t packet_rx)
 ******************************************************************************/
 double packet_payload_double_64(const packet_rx_t packet_rx)
 {
-	//use of a pointer to uint32_data is to avoid type punning
-	uint64_t uint64_data;
-	uint64_t *uint64_data_ptr;
-
-	uint64_data_ptr = &uint64_data;
-
-	uint64_data = packet_payload_uint64(packet_rx);
-
-	return *(double *)uint64_data_ptr;
+	return (double)unsr_64(packet_rx.payload);
 }
 
 
@@ -508,7 +471,7 @@ static void error_handler(packet_inst_t * const packet_inst, const packet_id_err
 }
 
 /******************************************************************************
-*  \brief reverse memory copy
+*  \brief Reverse memory copy
 *
 *  \note used to invert endianness
 ******************************************************************************/
@@ -521,4 +484,103 @@ static void * revmemcpy(void *dest, const void *src, size_t len)
 		*d-- = *s++;
 
 	return dest;
+}
+
+/******************************************************************************
+*  \brief Unserialize 16bit
+*
+*  \note
+******************************************************************************/
+static uint16_t unsr_16(const uint8_t * const big_endian_data)
+{
+    uint8_t i;
+    uint16_t tmp = 0;
+
+    for(i = 0; i < sizeof(tmp); i++)
+    {
+        tmp |= ((uint16_t)big_endian_data[i] << (sizeof(tmp) - 1 - i) * 8);
+    }
+
+    return tmp;
+}
+
+/******************************************************************************
+*  \brief Unserialize 32bit
+*
+*  \note
+******************************************************************************/
+static uint32_t unsr_32(const uint8_t * const big_endian_data)
+{
+    uint8_t i;
+    uint32_t tmp = 0;
+
+    for(i = 0; i < sizeof(tmp); i++)
+    {
+        tmp |= ((uint32_t)big_endian_data[i] << (sizeof(tmp) - 1 - i) * 8);
+    }
+
+    return tmp;
+}
+
+/******************************************************************************
+*  \brief Unserialize 64bit
+*
+*  \note
+******************************************************************************/
+static uint64_t unsr_64(const uint8_t * const big_endian_data)
+{
+    uint8_t i;
+    uint64_t tmp = 0;
+
+    for(i = 0; i < sizeof(tmp); i++)
+    {
+        tmp |= ((uint64_t)big_endian_data[i] << (sizeof(tmp) - 1 - i) * 8);
+    }
+
+    return tmp;
+}
+
+/******************************************************************************
+*  \brief Serialize 16bit, big endian
+*
+*  \note
+******************************************************************************/
+static void sr_16(uint8_t * const dest, const uint16_t src)
+{
+    uint8_t i;
+
+    for(i = 0; i < sizeof(src); i++)
+    {
+        dest[i] = (uint8_t)(src >> (sizeof(src) - 1 - i) * 8);
+    }
+}
+
+/******************************************************************************
+*  \brief Serialize 32bit, big endian
+*
+*  \note
+******************************************************************************/
+static void sr_32(uint8_t * const dest, const uint32_t src)
+{
+    uint8_t i;
+
+    for(i = 0; i < sizeof(src); i++)
+    {
+        dest[i] = (uint8_t)(src >> (sizeof(src) - 1 - i) * 8);
+    }
+}
+
+/******************************************************************************
+*  \brief Serialize 64bit, big endian
+*
+*  \note
+******************************************************************************/
+static void sr_64(uint8_t * const dest, const uint64_t src)
+{
+    uint8_t i;
+
+    for(i = 0; i < sizeof(src); i++)
+    {
+        dest[i] = (uint8_t)(src >> (sizeof(src) - 1 - i) * 8);
+    }
 }

@@ -80,10 +80,9 @@ typedef union bit64_dat_t
 /**************************************************************************************************
 *                                         LOCAL PROTOTYPES
 *************************************************^************************************************/
-static int16_t     default_rx_byte(void);
-static void        default_tx_data(const uint8_t * const data, const uint32_t length);
-static void        error_handler  (packet_inst_t * const packet_inst, const packet_id_err_t error);
-static void *      revmemcpy      (void* dest, const void* src, size_t len);
+static int16_t     dflt_rx_byte   (void);
+static void        dflt_tx_data   (const uint8_t * const data, const uint32_t length);
+static void        err_send       (pckt_inst_t * const packet_inst, const pckt_id_err_t error);
 static bit16_dat_t unsr_16        (const uint8_t * const big_endian_data);
 static bit32_dat_t unsr_32        (const uint8_t * const big_endian_data);
 static bit64_dat_t unsr_64        (const uint8_t * const big_endian_data);
@@ -100,14 +99,14 @@ static void        sr_64          (uint8_t * const dest, const uint64_t src);
 *
 *  \note
 ******************************************************************************/
-void packet_get_config_defaults(packet_conf_t * const packet_conf)
+void pckt_get_config_defaults(pckt_conf_t * const pckt_conf)
 {
-	packet_conf->tick_ptr              = NULL;
-	packet_conf->rx_byte_fptr          = default_rx_byte;
-	packet_conf->tx_data_fprt          = default_tx_data;
-	packet_conf->crc_16_fptr           = sw_crc;
-	packet_conf->clear_buffer_timeout  = 0xFFFFFFFF;
-	packet_conf->enable                = PACKET_ENABLED;
+	pckt_conf->tick_ptr              = NULL;
+	pckt_conf->rx_byte_fptr          = dflt_rx_byte;
+	pckt_conf->tx_data_fprt          = dflt_tx_data;
+	pckt_conf->crc_16_fptr           = pckt_sw_crc;
+	pckt_conf->clear_buffer_timeout  = 0xFFFFFFFF;
+	pckt_conf->enable                = PCKT_ENABLED;
 }
 
 /******************************************************************************
@@ -115,18 +114,18 @@ void packet_get_config_defaults(packet_conf_t * const packet_conf)
 *
 *  \note
 ******************************************************************************/
-void packet_init(packet_inst_t * const packet_inst, const packet_conf_t packet_conf)
+void pckt_init(pckt_inst_t * const pckt_inst, const pckt_conf_t pckt_conf)
 {
 	/*Conf*/
-	packet_inst->conf = packet_conf;
+	pckt_inst->conf = pckt_conf;
 
 	/*Inst*/
-	packet_inst->rx_byte              = 0;
-	memset(packet_inst->rx_buffer, 0, sizeof(packet_inst->rx_buffer));
-	packet_inst->rx_buffer_ind        = 0;
-	packet_inst->calc_crc_16_checksum = 0;
-	memset(&packet_inst->packet_rx, 0, sizeof(packet_inst->packet_rx));
-	packet_inst->last_tick            = *packet_inst->conf.tick_ptr;
+	pckt_inst->rx_byte              = 0;
+	memset(pckt_inst->rx_buffer, 0, sizeof(pckt_inst->rx_buffer));
+	pckt_inst->rx_buffer_ind        = 0;
+	pckt_inst->calc_crc_16_checksum = 0;
+	memset(&pckt_inst->pckt_rx, 0, sizeof(pckt_inst->pckt_rx));
+	pckt_inst->last_tick            = *pckt_inst->conf.tick_ptr;
 }
 
 /******************************************************************************
@@ -134,95 +133,95 @@ void packet_init(packet_inst_t * const packet_inst, const packet_conf_t packet_c
 *
 *  \note takes pointer to instance and function pointer to command handler
 ******************************************************************************/
-void packet_task(packet_inst_t * const packet_inst, void(*cmd_handler_fptr)(packet_inst_t * const, const packet_rx_t))
+void pckt_task(pckt_inst_t * const pckt_inst, void(*cmd_handler_fptr)(pckt_inst_t * const, const pckt_rx_t))
 {
 	/*If packet is disabled do not run*/
-	if(packet_inst->conf.enable == PACKET_DISABLED) return;
+	if(pckt_inst->conf.enable == PCKT_DISABLED) return;
 
 	/*Get byte*/
-	packet_inst->rx_byte = packet_inst->conf.rx_byte_fptr();
+	pckt_inst->rx_byte = pckt_inst->conf.rx_byte_fptr();
 
 	/*Check for received byte*/
-	if(packet_inst->rx_byte != -1)
+	if(pckt_inst->rx_byte != -1)
 	{
 		/*Record time of last byte*/
-		packet_inst->last_tick = *packet_inst->conf.tick_ptr;
+		pckt_inst->last_tick = *pckt_inst->conf.tick_ptr;
 
 		/*Is received buffer full?*/
-		if(packet_inst->rx_buffer_ind == RX_BUFFER_LEN_BYTES)
+		if(pckt_inst->rx_buffer_ind == RX_BUFFER_LEN_BYTES)
 		{
 			/*Set to the last byte*/
-			packet_inst->rx_buffer_ind -= 1;
+			pckt_inst->rx_buffer_ind -= 1;
 
 			/*Making it here means the received buffer is full*/
 		}
 		else
         {
             /*Put received byte in buffer*/
-            packet_inst->rx_buffer[packet_inst->rx_buffer_ind] = (uint8_t)packet_inst->rx_byte;
-            packet_inst->rx_buffer_ind++;
+            pckt_inst->rx_buffer[pckt_inst->rx_buffer_ind] = (uint8_t)pckt_inst->rx_byte;
+            pckt_inst->rx_buffer_ind++;
         }
 
 		/*Check for valid packet - after ID:0 ID:1 and LEN bytes received*/
-		if(packet_inst->rx_buffer_ind >= 3)
+		if(pckt_inst->rx_buffer_ind >= 3)
 		{
 			/*Copy LEN*/
-			packet_inst->packet_rx.len = packet_inst->rx_buffer[LEN_POS];
+			pckt_inst->pckt_rx.len = pckt_inst->rx_buffer[LEN_POS];
 
 			/*Verify LEN*/
-			if(packet_inst->packet_rx.len > MAX_PAYLOAD_LEN_BYTES)
+			if(pckt_inst->pckt_rx.len > MAX_PAYLOAD_LEN_BYTES)
 			{
 				/*If not going to fit force it down to the max*/
-				packet_inst->packet_rx.len = MAX_PAYLOAD_LEN_BYTES;
+				pckt_inst->pckt_rx.len = MAX_PAYLOAD_LEN_BYTES;
 			}
 
 			/*Check data received to see if all bytes received - the +5 is [ID:0, ID:1][LEN][CRC16:0, CRC16:1]*/
-			if((packet_inst->packet_rx.len + 5) == packet_inst->rx_buffer_ind)
+			if((pckt_inst->pckt_rx.len + 5) == pckt_inst->rx_buffer_ind)
 			{
 				/*Calculate checksum - performed on [ID:0, ID:1][LEN][PAYLOAD:0 ...,  PAYLOAD:n] if LEN=0 then just [ID:0, ID:1][LEN]*/
-				packet_inst->calc_crc_16_checksum = packet_inst->conf.crc_16_fptr(packet_inst->rx_buffer, (packet_inst->rx_buffer_ind - 2)); //subtract 2 bytes for [CRC16:0, CRC16:1]
+				pckt_inst->calc_crc_16_checksum = pckt_inst->conf.crc_16_fptr(pckt_inst->rx_buffer, (pckt_inst->rx_buffer_ind - 2)); //subtract 2 bytes for [CRC16:0, CRC16:1]
 
 				/*Copy received CRC checksum*/
-				packet_inst->packet_rx.crc_16_checksum = UNSERIALIZE_UINT16(packet_inst->rx_buffer[CRC1_POS(packet_inst->packet_rx.len)], packet_inst->rx_buffer[CRC0_POS(packet_inst->packet_rx.len)]);
+				pckt_inst->pckt_rx.crc_16_checksum = UNSERIALIZE_UINT16(pckt_inst->rx_buffer[CRC1_POS(pckt_inst->pckt_rx.len)], pckt_inst->rx_buffer[CRC0_POS(pckt_inst->pckt_rx.len)]);
 
 				/*Check if calculated checksum matches received*/
-				if(packet_inst->calc_crc_16_checksum == packet_inst->packet_rx.crc_16_checksum)
+				if(pckt_inst->calc_crc_16_checksum == pckt_inst->pckt_rx.crc_16_checksum)
 				{
 					/*Copy ID*/
-					packet_inst->packet_rx.id = UNSERIALIZE_UINT16(packet_inst->rx_buffer[ID_1_POS], packet_inst->rx_buffer[ID_0_POS]);
+					pckt_inst->pckt_rx.id = UNSERIALIZE_UINT16(pckt_inst->rx_buffer[ID_1_POS], pckt_inst->rx_buffer[ID_0_POS]);
 
 					/*Copy data - if data in packet*/
-					if(packet_inst->packet_rx.len > 0)
+					if(pckt_inst->pckt_rx.len > 0)
 					{
-						memcpy(packet_inst->packet_rx.payload, &packet_inst->rx_buffer[DATA_N_POS], packet_inst->packet_rx.len);
+						memcpy(pckt_inst->pckt_rx.payload, &pckt_inst->rx_buffer[DATA_N_POS], pckt_inst->pckt_rx.len);
 					}
 					/*Fill with zeros*/
 					else
 					{
-						memset(packet_inst->packet_rx.payload, 0, sizeof(packet_inst->packet_rx.payload));
+						memset(pckt_inst->pckt_rx.payload, 0, sizeof(pckt_inst->pckt_rx.payload));
 					}
 
 					/*Run command handler*/
-					cmd_handler_fptr(packet_inst, packet_inst->packet_rx);
+					cmd_handler_fptr(pckt_inst, pckt_inst->pckt_rx);
 				}
 				else
 				{
-					error_handler(packet_inst, PCKT_ID_ERR_CHECKSUM);
+					err_send(pckt_inst, PCKT_ID_ERR_CHECKSUM);
 				}
 
 				/*Clear buffer*/
-				packet_inst->rx_buffer_ind = 0;
+				pckt_inst->rx_buffer_ind = 0;
 			}
 		}
 	}
 
 	/*Clear buffer timeout if timeout has expired and there is data in the buffer*/
-	if(((*packet_inst->conf.tick_ptr - packet_inst->last_tick) >= packet_inst->conf.clear_buffer_timeout) && (packet_inst->rx_buffer_ind > 0))
+	if(((*pckt_inst->conf.tick_ptr - pckt_inst->last_tick) >= pckt_inst->conf.clear_buffer_timeout) && (pckt_inst->rx_buffer_ind > 0))
 	{
 		/*Clear buffer*/
-		packet_inst->rx_buffer_ind = 0;
+		pckt_inst->rx_buffer_ind = 0;
 
-		error_handler(packet_inst, PCKT_ID_ERR_TIMEOUT);
+		err_send(pckt_inst, PCKT_ID_ERR_TIMEOUT);
 	}
 }
 
@@ -234,7 +233,7 @@ void packet_task(packet_inst_t * const packet_inst, void(*cmd_handler_fptr)(pack
 *        CRC-16 (CRC-CCITT)
 *        Calculator: http://www.sunshine2k.de/coding/javascript/crc/crc_js.html
 ******************************************************************************/
-crc_t sw_crc(const uint8_t * const message, const uint32_t num_bytes)
+crc_t pckt_sw_crc(const uint8_t * const message, const uint32_t num_bytes)
 {
 	crc_t remainder = 0;
 
@@ -268,33 +267,33 @@ crc_t sw_crc(const uint8_t * const message, const uint32_t num_bytes)
 *
 *  \note
 ******************************************************************************/
-void packet_tx_raw(packet_inst_t * const packet_inst, const uint16_t id, const uint8_t * const data, uint8_t len)
+void pckt_tx_raw(pckt_inst_t * const pckt_inst, const uint16_t id, const uint8_t * const data, uint8_t len)
 {
-	uint8_t packet[RX_BUFFER_LEN_BYTES];
+	uint8_t pckt[RX_BUFFER_LEN_BYTES];
 	uint16_t checksum;
 
 	/*If packet is disabled do not run*/
-	if(packet_inst->conf.enable == PACKET_DISABLED) return;
+	if(pckt_inst->conf.enable == PCKT_DISABLED) return;
 
 	/*Limit len*/
 	len = (len > MAX_PAYLOAD_LEN_BYTES ? MAX_PAYLOAD_LEN_BYTES : len);
 
 	/*Copy data to holding array*/
-	packet[ID_1_POS] = (uint8_t)(id >> 8);
-	packet[ID_0_POS] = (uint8_t)id;
-	packet[LEN_POS]  = len;
+	pckt[ID_1_POS] = (uint8_t)(id >> 8);
+	pckt[ID_0_POS] = (uint8_t)id;
+	pckt[LEN_POS]  = len;
 
-	memcpy(&packet[DATA_N_POS], data, len);
+	memcpy(&pckt[DATA_N_POS], data, len);
 
 	/*Calc checksum*/
-	checksum = packet_inst->conf.crc_16_fptr(packet, (len + 3));
+	checksum = pckt_inst->conf.crc_16_fptr(pckt, (len + 3));
 
 	/*Copy checksum*/
-	packet[CRC1_POS(len)] = (uint8_t)(checksum >> 8);
-	packet[CRC0_POS(len)] = (uint8_t)checksum;
+	pckt[CRC1_POS(len)] = (uint8_t)(checksum >> 8);
+	pckt[CRC0_POS(len)] = (uint8_t)checksum;
 
 	/*TX packet*/
-	packet_inst->conf.tx_data_fprt(packet, len + 5);
+	pckt_inst->conf.tx_data_fprt(pckt, len + 5);
 }
 
 /******************************************************************************
@@ -302,9 +301,9 @@ void packet_tx_raw(packet_inst_t * const packet_inst, const uint16_t id, const u
 *
 *  \note
 ******************************************************************************/
-void packet_tx_u8(packet_inst_t * const packet_inst, const uint16_t id, const uint8_t data)
+void pckt_tx_u8(pckt_inst_t * const pckt_inst, const uint16_t id, const uint8_t data)
 {
-	packet_tx_raw(packet_inst, id, &data, sizeof(data));
+	pckt_tx_raw(pckt_inst, id, &data, sizeof(data));
 }
 
 /******************************************************************************
@@ -312,13 +311,13 @@ void packet_tx_u8(packet_inst_t * const packet_inst, const uint16_t id, const ui
 *
 *  \note
 ******************************************************************************/
-void packet_tx_s8(packet_inst_t * const packet_inst, const uint16_t id, const int8_t data)
+void pckt_tx_s8(pckt_inst_t * const pckt_inst, const uint16_t id, const int8_t data)
 {
-    bit8_dat_t data_tmp;
+    bit8_dat_t bit8_dat;
 
-    data_tmp._int = data;
+    bit8_dat._int = data;
 
-	packet_tx_raw(packet_inst, id, &data_tmp._uint, sizeof(data));
+	pckt_tx_raw(pckt_inst, id, &bit8_dat._uint, sizeof(data));
 }
 
 /******************************************************************************
@@ -326,12 +325,12 @@ void packet_tx_s8(packet_inst_t * const packet_inst, const uint16_t id, const in
 *
 *  \note
 ******************************************************************************/
-void packet_tx_u16(packet_inst_t * const packet_inst, const uint16_t id, const uint16_t data)
+void pckt_tx_u16(pckt_inst_t * const pckt_inst, const uint16_t id, const uint16_t data)
 {
-    uint8_t tmp[sizeof(data)];
+    uint8_t pckt[sizeof(data)];
 
-    sr_16(tmp, data);
-	packet_tx_raw(packet_inst, id, tmp, sizeof(data));
+    sr_16(pckt, data);
+	pckt_tx_raw(pckt_inst, id, pckt, sizeof(data));
 }
 
 /******************************************************************************
@@ -339,15 +338,15 @@ void packet_tx_u16(packet_inst_t * const packet_inst, const uint16_t id, const u
 *
 *  \note
 ******************************************************************************/
-void packet_tx_s16(packet_inst_t * const packet_inst, const uint16_t id, const int16_t data)
+void pckt_tx_s16(pckt_inst_t * const pckt_inst, const uint16_t id, const int16_t data)
 {
-    uint8_t tmp[sizeof(data)];
-    bit16_dat_t data_tmp;
+    uint8_t pckt[sizeof(data)];
+    bit16_dat_t bit16_dat;
 
-    data_tmp._int = data;
+    bit16_dat._int = data;
 
-    sr_16(tmp, data_tmp._uint);
-	packet_tx_raw(packet_inst, id, tmp, sizeof(data));
+    sr_16(pckt, bit16_dat._uint);
+	pckt_tx_raw(pckt_inst, id, pckt, sizeof(data));
 }
 
 /******************************************************************************
@@ -355,12 +354,12 @@ void packet_tx_s16(packet_inst_t * const packet_inst, const uint16_t id, const i
 *
 *  \note
 ******************************************************************************/
-void packet_tx_u32(packet_inst_t * const packet_inst, const uint16_t id, const uint32_t data)
+void pckt_tx_u32(pckt_inst_t * const pckt_inst, const uint16_t id, const uint32_t data)
 {
-    uint8_t tmp[sizeof(data)];
+    uint8_t pckt[sizeof(data)];
 
-    sr_32(tmp, data);
-	packet_tx_raw(packet_inst, id, tmp, sizeof(data));
+    sr_32(pckt, data);
+	pckt_tx_raw(pckt_inst, id, pckt, sizeof(data));
 }
 
 /******************************************************************************
@@ -368,15 +367,15 @@ void packet_tx_u32(packet_inst_t * const packet_inst, const uint16_t id, const u
 *
 *  \note
 ******************************************************************************/
-void packet_tx_s32(packet_inst_t * const packet_inst, const uint16_t id, const int32_t data)
+void pckt_tx_s32(pckt_inst_t * const pckt_inst, const uint16_t id, const int32_t data)
 {
-    uint8_t tmp[sizeof(data)];
-    bit32_dat_t data_tmp;
+    uint8_t pckt[sizeof(data)];
+    bit32_dat_t bit32_dat;
 
-    data_tmp._int = data;
+    bit32_dat._int = data;
 
-    sr_32(tmp, data_tmp._uint);
-	packet_tx_raw(packet_inst, id, tmp, sizeof(data));
+    sr_32(pckt, bit32_dat._uint);
+	pckt_tx_raw(pckt_inst, id, pckt, sizeof(data));
 }
 
 /******************************************************************************
@@ -384,15 +383,15 @@ void packet_tx_s32(packet_inst_t * const packet_inst, const uint16_t id, const i
 *
 *  \note
 ******************************************************************************/
-void packet_tx_float_32(packet_inst_t * const packet_inst, const uint16_t id, const float data)
+void pckt_tx_float_32(pckt_inst_t * const pckt_inst, const uint16_t id, const float data)
 {
-    uint8_t tmp[sizeof(data)];
-    bit32_dat_t data_tmp;
+    uint8_t pckt[sizeof(data)];
+    bit32_dat_t bit32_dat;
 
-    data_tmp._flt = data;
+    bit32_dat._flt = data;
 
-    sr_32(tmp, data_tmp._uint);
-	packet_tx_raw(packet_inst, id, tmp, sizeof(data));
+    sr_32(pckt, bit32_dat._uint);
+	pckt_tx_raw(pckt_inst, id, pckt, sizeof(data));
 }
 
 /******************************************************************************
@@ -400,12 +399,12 @@ void packet_tx_float_32(packet_inst_t * const packet_inst, const uint16_t id, co
 *
 *  \note
 ******************************************************************************/
-void packet_tx_u64(packet_inst_t * const packet_inst, const uint16_t id, const uint64_t data)
+void pckt_tx_u64(pckt_inst_t * const pckt_inst, const uint16_t id, const uint64_t data)
 {
-    uint8_t tmp[sizeof(data)];
+    uint8_t pckt[sizeof(data)];
 
-    sr_64(tmp, data);
-	packet_tx_raw(packet_inst, id, tmp, sizeof(data));
+    sr_64(pckt, data);
+	pckt_tx_raw(pckt_inst, id, pckt, sizeof(data));
 }
 
 /******************************************************************************
@@ -413,15 +412,15 @@ void packet_tx_u64(packet_inst_t * const packet_inst, const uint16_t id, const u
 *
 *  \note
 ******************************************************************************/
-void packet_tx_s64(packet_inst_t * const packet_inst, const uint16_t id, const int64_t data)
+void pckt_tx_s64(pckt_inst_t * const pckt_inst, const uint16_t id, const int64_t data)
 {
-    uint8_t tmp[sizeof(data)];
-    bit64_dat_t data_tmp;
+    uint8_t pckt[sizeof(data)];
+    bit64_dat_t bit64_dat;
 
-    data_tmp._int = data;
+    bit64_dat._int = data;
 
-    sr_64(tmp, data_tmp._uint);
-	packet_tx_raw(packet_inst, id, tmp, sizeof(data));
+    sr_64(pckt, bit64_dat._uint);
+	pckt_tx_raw(pckt_inst, id, pckt, sizeof(data));
 }
 
 /******************************************************************************
@@ -429,15 +428,15 @@ void packet_tx_s64(packet_inst_t * const packet_inst, const uint16_t id, const i
 *
 *  \note
 ******************************************************************************/
-void packet_tx_double_64(packet_inst_t * const packet_inst, const uint16_t id, const double data)
+void pckt_tx_double_64(pckt_inst_t * const pckt_inst, const uint16_t id, const double data)
 {
-    uint8_t tmp[sizeof(data)];
-    bit64_dat_t data_tmp;
+    uint8_t pckt[sizeof(data)];
+    bit64_dat_t bit64_dat;
 
-    data_tmp._dbl = data;
+    bit64_dat._dbl = data;
 
-    sr_64(tmp, data_tmp._uint);
-	packet_tx_raw(packet_inst, id, tmp, sizeof(data));
+    sr_64(pckt, bit64_dat._uint);
+	pckt_tx_raw(pckt_inst, id, pckt, sizeof(data));
 }
 
 /******************************************************************************
@@ -445,9 +444,9 @@ void packet_tx_double_64(packet_inst_t * const packet_inst, const uint16_t id, c
 *
 *  \note disables or enables packet task and packet_tx_raw
 ******************************************************************************/
-void packet_enable(packet_inst_t * const packet_inst, const packet_enable_t enable)
+void pckt_enable(pckt_inst_t * const pckt_inst, const pckt_en_t enable)
 {
-	packet_inst->conf.enable = enable;
+	pckt_inst->conf.enable = enable;
 }
 
 /******************************************************************************
@@ -455,9 +454,9 @@ void packet_enable(packet_inst_t * const packet_inst, const packet_enable_t enab
 *
 *  \note
 ******************************************************************************/
-uint8_t packet_payload_uint8(const packet_rx_t packet_rx)
+uint8_t pckt_rx_u8(const pckt_rx_t pckt_rx)
 {
-	return packet_rx.payload[0];
+	return pckt_rx.payload[0];
 }
 
 /******************************************************************************
@@ -465,13 +464,13 @@ uint8_t packet_payload_uint8(const packet_rx_t packet_rx)
 *
 *  \note
 ******************************************************************************/
-int8_t packet_payload_int8(const packet_rx_t packet_rx)
+int8_t pckt_rx_s8(const pckt_rx_t pckt_rx)
 {
-    bit8_dat_t tmp;
+    bit8_dat_t bit8_dat;
 
-    tmp._uint = packet_rx.payload[0];
+    bit8_dat._uint = pckt_rx.payload[0];
 
-	return tmp._int;
+	return bit8_dat._int;
 }
 
 /******************************************************************************
@@ -479,13 +478,13 @@ int8_t packet_payload_int8(const packet_rx_t packet_rx)
 *
 *  \note
 ******************************************************************************/
-uint16_t packet_payload_uint16(const packet_rx_t packet_rx)
+uint16_t pckt_rx_u16(const pckt_rx_t pckt_rx)
 {
-    bit16_dat_t tmp;
+    bit16_dat_t bit16_dat;
 
-    tmp = unsr_16(packet_rx.payload);
+    bit16_dat = unsr_16(pckt_rx.payload);
 
-	return tmp._uint;
+	return bit16_dat._uint;
 }
 
 /******************************************************************************
@@ -493,13 +492,13 @@ uint16_t packet_payload_uint16(const packet_rx_t packet_rx)
 *
 *  \note
 ******************************************************************************/
-int16_t packet_payload_int16(const packet_rx_t packet_rx)
+int16_t pckt_rx_s16(const pckt_rx_t pckt_rx)
 {
-    bit16_dat_t tmp;
+    bit16_dat_t bit16_dat;
 
-    tmp = unsr_16(packet_rx.payload);
+    bit16_dat = unsr_16(pckt_rx.payload);
 
-	return tmp._int;
+	return bit16_dat._int;
 }
 
 /******************************************************************************
@@ -507,13 +506,13 @@ int16_t packet_payload_int16(const packet_rx_t packet_rx)
 *
 *  \note
 ******************************************************************************/
-uint32_t packet_payload_uint32(const packet_rx_t packet_rx)
+uint32_t pckt_rx_u32(const pckt_rx_t pckt_rx)
 {
-	bit32_dat_t tmp;
+	bit32_dat_t bit32_dat;
 
-    tmp = unsr_32(packet_rx.payload);
+    bit32_dat = unsr_32(pckt_rx.payload);
 
-	return tmp._uint;
+	return bit32_dat._uint;
 }
 
 /******************************************************************************
@@ -521,13 +520,13 @@ uint32_t packet_payload_uint32(const packet_rx_t packet_rx)
 *
 *  \note
 ******************************************************************************/
-int32_t packet_payload_int32(const packet_rx_t packet_rx)
+int32_t pckt_rx_s32(const pckt_rx_t pckt_rx)
 {
-	bit32_dat_t tmp;
+	bit32_dat_t bit32_dat;
 
-    tmp = unsr_32(packet_rx.payload);
+    bit32_dat = unsr_32(pckt_rx.payload);
 
-	return tmp._int;
+	return bit32_dat._int;
 }
 
 /******************************************************************************
@@ -535,13 +534,13 @@ int32_t packet_payload_int32(const packet_rx_t packet_rx)
 *
 *  \note
 ******************************************************************************/
-float packet_payload_float_32(const packet_rx_t packet_rx)
+float pckt_rx_flt32(const pckt_rx_t pckt_rx)
 {
-	bit32_dat_t tmp;
+	bit32_dat_t bit32_dat;
 
-    tmp = unsr_32(packet_rx.payload);
+    bit32_dat = unsr_32(pckt_rx.payload);
 
-	return tmp._flt;
+	return bit32_dat._flt;
 }
 
 /******************************************************************************
@@ -549,13 +548,13 @@ float packet_payload_float_32(const packet_rx_t packet_rx)
 *
 *  \note
 ******************************************************************************/
-uint64_t packet_payload_uint64(const packet_rx_t packet_rx)
+uint64_t pckt_rx_u64(const pckt_rx_t pckt_rx)
 {
-	bit64_dat_t tmp;
+	bit64_dat_t bit64_dat;
 
-    tmp = unsr_64(packet_rx.payload);
+    bit64_dat = unsr_64(pckt_rx.payload);
 
-	return tmp._uint;
+	return bit64_dat._uint;
 }
 
 /******************************************************************************
@@ -563,13 +562,13 @@ uint64_t packet_payload_uint64(const packet_rx_t packet_rx)
 *
 *  \note
 ******************************************************************************/
-int64_t packet_payload_int64(const packet_rx_t packet_rx)
+int64_t pckt_rx_s64(const pckt_rx_t pckt_rx)
 {
-	bit64_dat_t tmp;
+	bit64_dat_t bit64_dat;
 
-    tmp = unsr_64(packet_rx.payload);
+    bit64_dat = unsr_64(pckt_rx.payload);
 
-	return tmp._int;
+	return bit64_dat._int;
 }
 
 /******************************************************************************
@@ -577,13 +576,13 @@ int64_t packet_payload_int64(const packet_rx_t packet_rx)
 *
 *  \note
 ******************************************************************************/
-double packet_payload_double_64(const packet_rx_t packet_rx)
+double pckt_rx_dbl64(const pckt_rx_t pckt_rx)
 {
-	bit64_dat_t tmp;
+	bit64_dat_t bit64_dat;
 
-    tmp = unsr_64(packet_rx.payload);
+    bit64_dat = unsr_64(pckt_rx.payload);
 
-	return tmp._dbl;
+	return bit64_dat._dbl;
 }
 
 
@@ -595,7 +594,7 @@ double packet_payload_double_64(const packet_rx_t packet_rx)
 *
 *  \note
 ******************************************************************************/
-static int16_t default_rx_byte(void)
+static int16_t dflt_rx_byte(void)
 {
 	return -1;
 }
@@ -605,7 +604,7 @@ static int16_t default_rx_byte(void)
 *
 *  \note
 ******************************************************************************/
-static void default_tx_data(const uint8_t * const data, const uint32_t length)
+static void dflt_tx_data(const uint8_t * const data, const uint32_t length)
 {
 	//empty
 }
@@ -615,25 +614,9 @@ static void default_tx_data(const uint8_t * const data, const uint32_t length)
 *
 *  \note This sends a packet which contains no data bytes but the ID indicates the error
 ******************************************************************************/
-static void error_handler(packet_inst_t * const packet_inst, const packet_id_err_t error)
+static void err_send(pckt_inst_t * const pckt_inst, const pckt_id_err_t error)
 {
-	packet_tx_raw(packet_inst, (uint16_t)error, 0, 0);
-}
-
-/******************************************************************************
-*  \brief Reverse memory copy
-*
-*  \note used to invert endianness
-******************************************************************************/
-static void * revmemcpy(void *dest, const void *src, size_t len)
-{
-	uint8_t *d = (uint8_t *)dest + len - 1;
-	const uint8_t *s = src;
-
-	while(len--)
-		*d-- = *s++;
-
-	return dest;
+	pckt_tx_raw(pckt_inst, (uint16_t)error, 0, 0);
 }
 
 /******************************************************************************
@@ -644,14 +627,14 @@ static void * revmemcpy(void *dest, const void *src, size_t len)
 static bit16_dat_t unsr_16(const uint8_t * const big_endian_data)
 {
     uint8_t i;
-    bit16_dat_t tmp = {0};
+    bit16_dat_t bit16_dat = {0};
 
-    for(i = 0; i < sizeof(tmp); i++)
+    for(i = 0; i < sizeof(bit16_dat); i++)
     {
-        tmp._uint |= ((uint16_t)big_endian_data[i] << (sizeof(tmp) - 1 - i) * 8);
+        bit16_dat._uint |= ((uint16_t)big_endian_data[i] << (sizeof(bit16_dat) - 1 - i) * 8);
     }
 
-    return tmp;
+    return bit16_dat;
 }
 
 /******************************************************************************
@@ -662,14 +645,14 @@ static bit16_dat_t unsr_16(const uint8_t * const big_endian_data)
 static bit32_dat_t unsr_32(const uint8_t * const big_endian_data)
 {
     uint8_t i;
-    bit32_dat_t tmp = {0};
+    bit32_dat_t bit32_dat = {0};
 
-    for(i = 0; i < sizeof(tmp); i++)
+    for(i = 0; i < sizeof(bit32_dat); i++)
     {
-        tmp._uint |= ((uint32_t)big_endian_data[i] << (sizeof(tmp) - 1 - i) * 8);
+        bit32_dat._uint |= ((uint32_t)big_endian_data[i] << (sizeof(bit32_dat) - 1 - i) * 8);
     }
 
-    return tmp;
+    return bit32_dat;
 }
 
 /******************************************************************************
@@ -680,14 +663,14 @@ static bit32_dat_t unsr_32(const uint8_t * const big_endian_data)
 static bit64_dat_t unsr_64(const uint8_t * const big_endian_data)
 {
     uint8_t i;
-    bit64_dat_t tmp = {0};
+    bit64_dat_t bit64_dat = {0};
 
-    for(i = 0; i < sizeof(tmp); i++)
+    for(i = 0; i < sizeof(bit64_dat); i++)
     {
-        tmp._uint |= ((uint64_t)big_endian_data[i] << (sizeof(tmp) - 1 - i) * 8);
+        bit64_dat._uint |= ((uint64_t)big_endian_data[i] << (sizeof(bit64_dat) - 1 - i) * 8);
     }
 
-    return tmp;
+    return bit64_dat;
 }
 
 /******************************************************************************

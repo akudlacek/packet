@@ -54,7 +54,7 @@ static void     a_tx_data(const uint8_t * const data, uint32_t length);
 static int16_t  b_rx_byte(void);
 static void     b_tx_data(const uint8_t * const data, uint32_t length);
 
-static void     packet_cmd_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx);
+static void     packet_cmd_handler(pckt_inst_t *pckt_inst, pckt_rx_t pckt_rx);
 static uint64_t rand_range        (uint64_t min, uint64_t max);
 static uint64_t rand_uint64_slow  (void);
 static uint32_t rand_uint32_slow  (void);
@@ -68,8 +68,8 @@ static void     gen_rand_vals     (void);
 static volatile uint32_t sys_tick_ms = 0;
 static const volatile uint32_t * const sys_tick_ms_ptr = &sys_tick_ms;
 
-static packet_inst_t a_packet_inst;
-static packet_inst_t b_packet_inst;
+static pckt_inst_t a_pckt_inst;
+static pckt_inst_t b_pckt_inst;
 
 static ring_buffer_t a_buff;
 static ring_buffer_t b_buff;
@@ -102,7 +102,7 @@ int main(void)
 {
 	uint32_t last_tick_ms;
 	uint32_t cmd_time_val_ms = PACKET_RX_TIMEOUT_MS + 10;
-	packet_conf_t packet_conf;
+	pckt_conf_t pckt_conf;
 	uint32_t id = 0;
 
 	uint32_t i;
@@ -120,21 +120,21 @@ int main(void)
 	ring_buffer_init(&b_buff, b_arr, sizeof(b_arr));
 
 	/*Packet init*/
-	packet_get_config_defaults(&packet_conf);
-	packet_conf.tick_ptr = sys_tick_ms_ptr;
+	pckt_get_config_defaults(&pckt_conf);
+	pckt_conf.tick_ptr = sys_tick_ms_ptr;
 	//using built in crc-16
-	packet_conf.clear_buffer_timeout = PACKET_RX_TIMEOUT_MS;
-	packet_conf.enable = PACKET_ENABLED;
+	pckt_conf.clear_buffer_timeout = PACKET_RX_TIMEOUT_MS;
+	pckt_conf.enable = PCKT_ENABLED;
 
 	//a specific
-	packet_conf.rx_byte_fptr = a_rx_byte;
-	packet_conf.tx_data_fprt = a_tx_data;
-	packet_init(&a_packet_inst, packet_conf);
+	pckt_conf.rx_byte_fptr = a_rx_byte;
+	pckt_conf.tx_data_fprt = a_tx_data;
+	pckt_init(&a_pckt_inst, pckt_conf);
 
 	//b specific
-	packet_conf.rx_byte_fptr = b_rx_byte;
-	packet_conf.tx_data_fprt = b_tx_data;
-	packet_init(&b_packet_inst, packet_conf);
+	pckt_conf.rx_byte_fptr = b_rx_byte;
+	pckt_conf.tx_data_fprt = b_tx_data;
+	pckt_init(&b_pckt_inst, pckt_conf);
 
 	printf("hello\r\n");
 
@@ -142,8 +142,8 @@ int main(void)
 	{
 		sys_tick_ms = GetTickCount();
 
-		packet_task(&a_packet_inst, packet_cmd_handler);
-		packet_task(&b_packet_inst, packet_cmd_handler);
+		pckt_task(&a_pckt_inst, packet_cmd_handler);
+		pckt_task(&b_pckt_inst, packet_cmd_handler);
 
 		/*test tx, rx, encode, and decode*/
 		if((*sys_tick_ms_ptr - last_tick_ms) >= cmd_time_val_ms)
@@ -152,37 +152,37 @@ int main(void)
 			{
 				/*Testing basic functions - BEGIN*/
 				case 0:
-					packet_tx_raw(&a_packet_inst, id, str_val, sizeof(str_val));
+					pckt_tx_raw(&a_pckt_inst, id, str_val, sizeof(str_val));
 					break;
 				case 1:
-					packet_tx_u8(&a_packet_inst, id, uint8_val);
+					pckt_tx_u8(&a_pckt_inst, id, uint8_val);
 					break;
 				case 2:
-					packet_tx_s8(&a_packet_inst, id, int8_val);
+					pckt_tx_s8(&a_pckt_inst, id, int8_val);
 					break;
 				case 3:
-					packet_tx_u16(&a_packet_inst, id, uint16_val);
+					pckt_tx_u16(&a_pckt_inst, id, uint16_val);
 					break;
 				case 4:
-					packet_tx_s16(&a_packet_inst, id, int16_val);
+					pckt_tx_s16(&a_pckt_inst, id, int16_val);
 					break;
 				case 5:
-					packet_tx_u32(&a_packet_inst, id, uint32_val);
+					pckt_tx_u32(&a_pckt_inst, id, uint32_val);
 					break;
 				case 6:
-					packet_tx_s32(&a_packet_inst, id, int32_val);
+					pckt_tx_s32(&a_pckt_inst, id, int32_val);
 					break;
 				case 7:
-					packet_tx_u64(&a_packet_inst, id, uint64_val);
+					pckt_tx_u64(&a_pckt_inst, id, uint64_val);
 					break;
 				case 8:
-					packet_tx_s64(&a_packet_inst, id, int64_val);
+					pckt_tx_s64(&a_pckt_inst, id, int64_val);
 					break;
 				case 9:
-					packet_tx_float_32(&a_packet_inst, id, float_val);
+					pckt_tx_float_32(&a_pckt_inst, id, float_val);
 					break;
 				case 10:
-					packet_tx_double_64(&a_packet_inst, id, double_val);
+					pckt_tx_double_64(&a_pckt_inst, id, double_val);
 					break;
 				/*Testing basic functions - END*/
 
@@ -190,7 +190,7 @@ int main(void)
 				case 11:
 					//13 is the number of bytes in this packet
 					//Sends normal packet
-					packet_tx_double_64(&a_packet_inst, id, double_val);
+					pckt_tx_double_64(&a_pckt_inst, id, double_val);
 
 					//Retrieve that packet
 					for(i = 0; i < 13; i++)
@@ -209,7 +209,7 @@ int main(void)
 				case 12:
 					//13 is the number of bytes in this packet
 					//Sends normal packet
-					packet_tx_double_64(&a_packet_inst, id, double_val);
+					pckt_tx_double_64(&a_pckt_inst, id, double_val);
 
 					//Retrieve that packet
 					for(i = 0; i < 13; i++)
@@ -221,13 +221,13 @@ int main(void)
 					a_tx_data(tmp_data_arr, 12);
 
 					//set cmd send time to greater than timeout val so the timeout can occur before next packet is sent thus causing a checksum error
-					cmd_time_val_ms = b_packet_inst.conf.clear_buffer_timeout + 5;
+					//cmd_time_val_ms = b_pckt_inst.conf.clear_buffer_timeout + 5;
 					break;
 
 					//Sends normal packet
 				case 13:
 
-					packet_tx_double_64(&a_packet_inst, id, double_val);
+					pckt_tx_double_64(&a_pckt_inst, id, double_val);
 					break;
 
 					//send example packet
@@ -241,7 +241,7 @@ int main(void)
 					* Packet sent
 					*  0   1   2   3   4   5   6
 					* [DE][AD][02][BE][EF][74][19] */
-					packet_tx_u16(&a_packet_inst, 0xDEAD, 0xBEEF);
+					pckt_tx_u16(&a_pckt_inst, 0xDEAD, 0xBEEF);
 					break;
 
 				default:
@@ -272,8 +272,8 @@ int main(void)
 
 	while(1)
 	{
-		packet_task(&a_packet_inst, packet_cmd_handler);
-		packet_task(&b_packet_inst, packet_cmd_handler);
+		pckt_task(&a_pckt_inst, packet_cmd_handler);
+		pckt_task(&b_pckt_inst, packet_cmd_handler);
 	}
 
 	return 0;
@@ -348,65 +348,65 @@ static void b_tx_data(const uint8_t * const data, uint32_t length)
 *
 *  \note
 ******************************************************************************/
-static void packet_cmd_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx)
+static void packet_cmd_handler(pckt_inst_t *pckt_inst, pckt_rx_t pckt_rx)
 {
 	uint8_t successful = 0;
 	static uint16_t last_id;
 
 	//B received
-	if(packet_inst == &b_packet_inst)
+	if(pckt_inst == &b_pckt_inst)
 	{
 		//echo back to a
-		packet_tx_raw(&b_packet_inst, packet_rx.id, packet_rx.payload, packet_rx.len);
+		pckt_tx_raw(&b_pckt_inst, pckt_rx.id, pckt_rx.payload, pckt_rx.len);
 	}
 
 	//A received
-	else if(packet_inst == &a_packet_inst)
+	else if(pckt_inst == &a_pckt_inst)
 	{
-		switch(packet_rx.id)
+		switch(pckt_rx.id)
 		{
 			case 0:
-				if(memcmp(packet_rx.payload, str_val, sizeof(str_val)) == 0)
+				if(memcmp(pckt_rx.payload, str_val, sizeof(str_val)) == 0)
 					successful = 1;
 				break;
 			case 1:
-				if(uint8_val == packet_payload_uint8(packet_rx))
+				if(uint8_val == pckt_rx_u8(pckt_rx))
 					successful = 1;
 				break;
 			case 2:
-				if(int8_val == packet_payload_int8(packet_rx))
+				if(int8_val == pckt_rx_s8(pckt_rx))
 					successful = 1;
 				break;
 			case 3:
-				if(uint16_val == packet_payload_uint16(packet_rx))
+				if(uint16_val == pckt_rx_u16(pckt_rx))
 					successful = 1;
 				break;
 			case 4:
-				if(int16_val == packet_payload_int16(packet_rx))
+				if(int16_val == pckt_rx_s16(pckt_rx))
 					successful = 1;
 				break;
 			case 5:
-				if(uint32_val == packet_payload_uint32(packet_rx))
+				if(uint32_val == pckt_rx_u32(pckt_rx))
 					successful = 1;
 				break;
 			case 6:
-				if(int32_val == packet_payload_int32(packet_rx))
+				if(int32_val == pckt_rx_s32(pckt_rx))
 					successful = 1;
 				break;
 			case 7:
-				if(uint64_val == packet_payload_uint64(packet_rx))
+				if(uint64_val == pckt_rx_u64(pckt_rx))
 					successful = 1;
 				break;
 			case 8:
-				if(int64_val == packet_payload_int64(packet_rx))
+				if(int64_val == pckt_rx_s64(pckt_rx))
 					successful = 1;
 				break;
 			case 9:
-				if(float_val == packet_payload_float_32(packet_rx))
+				if(float_val == pckt_rx_flt32(pckt_rx))
 					successful = 1;
 				break;
 			case 10:
-				if(double_val == packet_payload_double_64(packet_rx))
+				if(double_val == pckt_rx_dbl64(pckt_rx))
 					successful = 1;
 				break;
 
@@ -425,12 +425,12 @@ static void packet_cmd_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx
 				break;
 
 			case 13:
-				if(double_val == packet_payload_double_64(packet_rx))
+				if(double_val == pckt_rx_dbl64(pckt_rx))
 					successful = 1;
 				break;
 
 			case 0xDEAD:
-				if(packet_rx.len == 2 && packet_payload_uint16(packet_rx) == 0xBEEF && packet_rx.crc_16_checksum == 0x7419)
+				if(pckt_rx.len == 2 && pckt_rx_u16(pckt_rx) == 0xBEEF && pckt_rx.crc_16_checksum == 0x7419)
 					successful = 1;
 				break;
 
@@ -472,7 +472,7 @@ static void packet_cmd_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx
 		//if successful not 0 or 1 then message is handled in the case above
 		if(successful < 2)
 		{
-			printf("TEST: 0x%X %s\r\n", packet_rx.id, (successful == 1 ? "SUCCESS" : "FAIL"));
+			printf("TEST: 0x%X %s\r\n", pckt_rx.id, (successful == 1 ? "SUCCESS" : "FAIL"));
 
 			//stop on FAIL
 			if(successful == 0)
@@ -481,7 +481,7 @@ static void packet_cmd_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx
             }
 		}
 
-		last_id = packet_rx.id; //record last id to verify proper test response
+		last_id = pckt_rx.id; //record last id to verify proper test response
 	}
 }
 

@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <windows.h>
 #include <time.h>
+#include <math.h>
 
 #include "./ring_buffer/ring_buffer.h"
 
@@ -15,7 +16,34 @@
 /**************************************************************************************************
 *                                             DEFINES
 *************************************************^************************************************/
-#define PACKET_RX_TIMEOUT_MS 500
+#define PACKET_RX_TIMEOUT_MS 10
+
+
+typedef union bit8_dat_t
+{
+	uint8_t _uint;
+	int8_t _int;
+} bit8_dat_t;
+
+typedef union bit16_dat_t
+{
+	uint16_t _uint;
+	int16_t _int;
+} bit16_dat_t;
+
+typedef union bit32_dat_t
+{
+	uint32_t _uint;
+	int32_t _int;
+	float _flt;
+} bit32_dat_t;
+
+typedef union bit64_dat_t
+{
+	uint64_t _uint;
+	int64_t _int;
+	double _dbl;
+} bit64_dat_t;
 
 
 /**************************************************************************************************
@@ -27,8 +55,11 @@ static int16_t  b_rx_byte(void);
 static void     b_tx_data(const uint8_t * const data, uint32_t length);
 
 static void     packet_cmd_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx);
-static uint64_t rand_range(uint64_t min, uint64_t max);
-static uint64_t rand_uint64_slow(void);
+static uint64_t rand_range        (uint64_t min, uint64_t max);
+static uint64_t rand_uint64_slow  (void);
+static uint32_t rand_uint32_slow  (void);
+static uint16_t rand_uint16_slow  (void);
+static void     gen_rand_vals     (void);
 
 
 /**************************************************************************************************
@@ -46,17 +77,17 @@ static ring_buffer_t b_buff;
 static volatile uint8_t a_arr[1000];
 static volatile uint8_t b_arr[1000];
 
-static char     str_val[] = "test";
-static uint8_t  uint8_val;
-static int8_t   int8_val;
-static uint16_t uint16_val;
-static int16_t  int16_val;
-static uint32_t uint32_val;
-static int32_t  int32_val;
-static uint64_t uint64_val;
-static int64_t  int64_val;
-static float    float_val;
-static double   double_val;
+static unsigned char str_val[] = "test";
+static  uint8_t      uint8_val;
+static   int8_t      int8_val;
+static uint16_t      uint16_val;
+static  int16_t      int16_val;
+static uint32_t      uint32_val;
+static  int32_t      int32_val;
+static uint64_t      uint64_val;
+static  int64_t      int64_val;
+static    float      float_val;
+static   double      double_val;
 
 
 /**************************************************************************************************
@@ -70,7 +101,7 @@ static double   double_val;
 int main(void)
 {
 	uint32_t last_tick_ms;
-	uint32_t cmd_time_val_ms = 100;
+	uint32_t cmd_time_val_ms = PACKET_RX_TIMEOUT_MS + 10;
 	packet_conf_t packet_conf;
 	uint32_t id = 0;
 
@@ -80,16 +111,7 @@ int main(void)
 	/* initialize random seed: */
 	srand((unsigned int)time(NULL));
 
-	uint8_val    = (uint8_t)rand_range(0, UINT8_MAX);
-	int8_val     = (int8_t)rand_range(INT8_MIN, INT8_MAX);
-	uint16_val   = (uint16_t)rand_range(0, UINT16_MAX);
-	int16_val    = (int16_t)rand_range(INT16_MIN, INT16_MAX);
-	uint32_val   = (uint32_t)rand_range(0, UINT32_MAX);
-	int32_val    = (int32_t)rand_range(INT32_MIN, INT32_MAX);
-	uint64_val   = (uint64_t)rand_uint64_slow();
-	int64_val    = (int64_t)rand_uint64_slow();
-	float_val    = (float)rand()/(float)rand_range(1, UINT16_MAX);
-	double_val   = (double)rand()/(double)rand_range(1, UINT16_MAX);
+	gen_rand_vals();
 
 	sys_tick_ms  = GetTickCount();
 	last_tick_ms = *sys_tick_ms_ptr;
@@ -130,31 +152,31 @@ int main(void)
 			{
 				/*Testing basic functions - BEGIN*/
 				case 0:
-					packet_tx_raw(&a_packet_inst, id, (uint8_t *)str_val, (uint8_t)sizeof(str_val));
+					packet_tx_raw(&a_packet_inst, id, str_val, sizeof(str_val));
 					break;
 				case 1:
-					packet_tx_8(&a_packet_inst, id, uint8_val);
+					packet_tx_u8(&a_packet_inst, id, uint8_val);
 					break;
 				case 2:
-					packet_tx_8(&a_packet_inst, id, int8_val);
+					packet_tx_s8(&a_packet_inst, id, int8_val);
 					break;
 				case 3:
-					packet_tx_16(&a_packet_inst, id, uint16_val);
+					packet_tx_u16(&a_packet_inst, id, uint16_val);
 					break;
 				case 4:
-					packet_tx_16(&a_packet_inst, id, int16_val);
+					packet_tx_s16(&a_packet_inst, id, int16_val);
 					break;
 				case 5:
-					packet_tx_32(&a_packet_inst, id, uint32_val);
+					packet_tx_u32(&a_packet_inst, id, uint32_val);
 					break;
 				case 6:
-					packet_tx_32(&a_packet_inst, id, int32_val);
+					packet_tx_s32(&a_packet_inst, id, int32_val);
 					break;
 				case 7:
-					packet_tx_64(&a_packet_inst, id, uint64_val);
+					packet_tx_u64(&a_packet_inst, id, uint64_val);
 					break;
 				case 8:
-					packet_tx_64(&a_packet_inst, id, int64_val);
+					packet_tx_s64(&a_packet_inst, id, int64_val);
 					break;
 				case 9:
 					packet_tx_float_32(&a_packet_inst, id, float_val);
@@ -177,10 +199,10 @@ int main(void)
 					}
 
 					//corrupt a byte
-					tmp_data_arr[(uint8_t)rand_range(0,12)] ^= 0xFF;
+					tmp_data_arr[rand_range(0,12)] ^= 0xFF;
 
 					//put bad packet back
-					a_tx_data((uint8_t *)tmp_data_arr, 13);
+					a_tx_data(tmp_data_arr, 13);
 					break;
 
 				//send partial packet and ensure it times out
@@ -196,7 +218,7 @@ int main(void)
 					}
 
 					//put packet missing one byte back
-					a_tx_data((uint8_t *)tmp_data_arr, 12);
+					a_tx_data(tmp_data_arr, 12);
 
 					//set cmd send time to greater than timeout val so the timeout can occur before next packet is sent thus causing a checksum error
 					cmd_time_val_ms = b_packet_inst.conf.clear_buffer_timeout + 5;
@@ -219,7 +241,7 @@ int main(void)
 					* Packet sent
 					*  0   1   2   3   4   5   6
 					* [DE][AD][02][BE][EF][74][19] */
-					packet_tx_16(&a_packet_inst, 0xDEAD, 0xBEEF);
+					packet_tx_u16(&a_packet_inst, 0xDEAD, 0xBEEF);
 					break;
 
 				default:
@@ -232,7 +254,12 @@ int main(void)
 			}
 			else
 			{
-				break; //leave timed testing loop
+				//break; //leave timed testing loop
+
+				//restart testing
+                id = 0;
+
+                gen_rand_vals();
 			}
 
 
@@ -343,11 +370,11 @@ static void packet_cmd_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx
 					successful = 1;
 				break;
 			case 1:
-				if(uint8_val == packet_rx.payload[0])
+				if(uint8_val == packet_payload_uint8(packet_rx))
 					successful = 1;
 				break;
 			case 2:
-				if(int8_val == (int8_t)packet_rx.payload[0])
+				if(int8_val == packet_payload_int8(packet_rx))
 					successful = 1;
 				break;
 			case 3:
@@ -387,12 +414,14 @@ static void packet_cmd_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx
 				//id 11 should NOT get here
 				successful = 0;
 				printf("CHECKSUM FAIL ");
+				while(1);
 				break;
 
 			case 12:
 				//id 12 should NOT get here
 				successful = 0;
 				printf("TIMEOUT FAIL ");
+				while(1);
 				break;
 
 			case 13:
@@ -410,11 +439,12 @@ static void packet_cmd_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx
 				if(last_id == 10)
 				{
 					//id 11 should return an error
-					printf("TEST: 11 SUCCESS\r\n");
+					printf("TEST: 0xB SUCCESS\r\n");
 				}
 				else
 				{
 					printf("PCKT_ID_ERR_CHECKSUM UNKNOWN SOURCE\r\n");
+					while(1);
 				}
 				break;
 
@@ -424,23 +454,31 @@ static void packet_cmd_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx
 				{
 					//if last id was 11 then 11 failed test, if PCKT_ID_ERR_CHECKSUM was last then id 11 passed, FYI
 					//id 12 should return an error
-					printf("TEST: 12 SUCCESS\r\n");
+					printf("TEST: 0xC SUCCESS\r\n");
 				}
 				else
 				{
 					printf("PCKT_ID_ERR_TIMEOUT UNKNOWN SOURCE\r\n");
+					while(1);
 				}
 				break;
 
 			default:
 				printf("BAD ID ERROR ON A\r\n");
+				while(1);
 				break;
 		}
 
 		//if successful not 0 or 1 then message is handled in the case above
 		if(successful < 2)
 		{
-			printf("TEST: %u %s\r\n", packet_rx.id, (successful == 1 ? "SUCCESS" : "FAIL"));
+			printf("TEST: 0x%X %s\r\n", packet_rx.id, (successful == 1 ? "SUCCESS" : "FAIL"));
+
+			//stop on FAIL
+			if(successful == 0)
+            {
+                while(1);
+            }
 		}
 
 		last_id = packet_rx.id; //record last id to verify proper test response
@@ -452,7 +490,7 @@ static void packet_cmd_handler(packet_inst_t *packet_inst, packet_rx_t packet_rx
 ******************************************************************************/
 static uint64_t rand_range(uint64_t min, uint64_t max)
 {
-	return rand() % (max - min + 1) + min;
+	return rand_uint64_slow() % (max - min + 1) + min;
 }
 
 /******************************************************************************
@@ -466,4 +504,68 @@ static uint64_t rand_uint64_slow(void)
 		r = r * 2 + rand() % 2;
 	}
 	return r;
+}
+
+/******************************************************************************
+* 32 bit rand
+******************************************************************************/
+static uint32_t rand_uint32_slow(void)
+{
+	uint32_t r = 0;
+	for(int i = 0; i < 32; i++)
+	{
+		r = r * 2 + rand() % 2;
+	}
+	return r;
+}
+
+/******************************************************************************
+* 16 bit rand
+******************************************************************************/
+static uint16_t rand_uint16_slow(void)
+{
+	uint16_t r = 0;
+	for(int i = 0; i < 16; i++)
+	{
+		r = r * 2 + rand() % 2;
+	}
+	return r;
+}
+
+/******************************************************************************
+* generate random values
+******************************************************************************/
+static void gen_rand_vals(void)
+{
+    bit8_dat_t  tmp_8bit;
+    bit16_dat_t tmp_16bit;
+    bit32_dat_t tmp_32bit;
+    bit64_dat_t tmp_64bit;
+
+     tmp_8bit._uint = rand();
+    tmp_16bit._uint = rand_uint16_slow();
+    tmp_32bit._uint = rand_uint32_slow();
+    tmp_64bit._uint = rand_uint64_slow();
+
+     uint8_val =  tmp_8bit._uint;
+	  int8_val =  tmp_8bit._int;
+	uint16_val = tmp_16bit._uint;
+	 int16_val = tmp_16bit._int;
+	uint32_val = tmp_32bit._uint;
+	 int32_val = tmp_32bit._int;
+	uint64_val = tmp_64bit._uint;
+	 int64_val = tmp_64bit._int;
+
+	 //generate new value if not valid e.g. NAN, INF
+	while(!isnormal(tmp_32bit._flt))
+    {
+        tmp_32bit._uint = rand_uint32_slow();
+    }
+    float_val = tmp_32bit._flt;
+
+    while(!isnormal(tmp_64bit._dbl))
+    {
+        tmp_64bit._uint = rand_uint64_slow();
+    }
+    double_val = tmp_64bit._dbl;
 }

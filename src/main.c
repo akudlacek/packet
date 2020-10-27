@@ -101,7 +101,7 @@ static   double      double_val;
 int main(void)
 {
 	uint32_t last_tick_ms;
-	uint32_t cmd_time_val_ms = PACKET_RX_TIMEOUT_MS + 10;
+	uint32_t cmd_time_val_ms = PACKET_RX_TIMEOUT_MS;
 	pckt_conf_t pckt_conf;
 	uint32_t id = 0;
 
@@ -146,7 +146,7 @@ int main(void)
 		pckt_task(&b_pckt_inst, packet_cmd_handler);
 
 		/*test tx, rx, encode, and decode*/
-		if((*sys_tick_ms_ptr - last_tick_ms) >= cmd_time_val_ms)
+		if((sys_tick_ms - last_tick_ms) >= cmd_time_val_ms)
 		{
 			switch(id)
 			{
@@ -179,10 +179,10 @@ int main(void)
 					pckt_tx_s64(&a_pckt_inst, id, int64_val);
 					break;
 				case 9:
-					pckt_tx_float_32(&a_pckt_inst, id, float_val);
+					pckt_tx_flt32(&a_pckt_inst, id, float_val);
 					break;
 				case 10:
-					pckt_tx_double_64(&a_pckt_inst, id, double_val);
+					pckt_tx_dbl64(&a_pckt_inst, id, double_val);
 					break;
 				/*Testing basic functions - END*/
 
@@ -190,7 +190,7 @@ int main(void)
 				case 11:
 					//13 is the number of bytes in this packet
 					//Sends normal packet
-					pckt_tx_double_64(&a_pckt_inst, id, double_val);
+					pckt_tx_dbl64(&a_pckt_inst, id, double_val);
 
 					//Retrieve that packet
 					for(i = 0; i < 13; i++)
@@ -199,7 +199,7 @@ int main(void)
 					}
 
 					//corrupt a byte
-					tmp_data_arr[rand_range(0,12)] ^= 0xFF;
+					tmp_data_arr[12] ^= 0xFF;
 
 					//put bad packet back
 					a_tx_data(tmp_data_arr, 13);
@@ -207,27 +207,21 @@ int main(void)
 
 				//send partial packet and ensure it times out
 				case 12:
-					//13 is the number of bytes in this packet
-					//Sends normal packet
-					pckt_tx_double_64(&a_pckt_inst, id, double_val);
+					//send incomplete packet
+					tmp_data_arr[0] = 'a';
+					a_tx_data(tmp_data_arr, 1);
 
-					//Retrieve that packet
-					for(i = 0; i < 13; i++)
+					//delay for timeout to occur.
+					while((sys_tick_ms - last_tick_ms) <= PACKET_RX_TIMEOUT_MS * 2)
 					{
-						tmp_data_arr[i] = (uint8_t)b_rx_byte();
+						sys_tick_ms = GetTickCount();
 					}
-
-					//put packet missing one byte back
-					a_tx_data(tmp_data_arr, 12);
-
-					//set cmd send time to greater than timeout val so the timeout can occur before next packet is sent thus causing a checksum error
-					//cmd_time_val_ms = b_pckt_inst.conf.clear_buffer_timeout + 5;
 					break;
 
 					//Sends normal packet
 				case 13:
 
-					pckt_tx_double_64(&a_pckt_inst, id, double_val);
+					pckt_tx_dbl64(&a_pckt_inst, id, double_val);
 					break;
 
 					//send example packet
@@ -263,7 +257,7 @@ int main(void)
 			}
 
 
-			last_tick_ms = *sys_tick_ms_ptr;
+			last_tick_ms = sys_tick_ms;
 		}
 
 	}

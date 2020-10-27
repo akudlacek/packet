@@ -383,7 +383,7 @@ void pckt_tx_s32(pckt_inst_t * const pckt_inst, const uint16_t id, const int32_t
 *
 *  \note
 ******************************************************************************/
-void pckt_tx_float_32(pckt_inst_t * const pckt_inst, const uint16_t id, const float data)
+void pckt_tx_flt32(pckt_inst_t * const pckt_inst, const uint16_t id, const float data)
 {
     uint8_t pckt[sizeof(data)];
     bit32_dat_t bit32_dat;
@@ -428,7 +428,7 @@ void pckt_tx_s64(pckt_inst_t * const pckt_inst, const uint16_t id, const int64_t
 *
 *  \note
 ******************************************************************************/
-void pckt_tx_double_64(pckt_inst_t * const pckt_inst, const uint16_t id, const double data)
+void pckt_tx_dbl64(pckt_inst_t * const pckt_inst, const uint16_t id, const double data)
 {
     uint8_t pckt[sizeof(data)];
     bit64_dat_t bit64_dat;

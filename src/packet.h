@@ -98,10 +98,10 @@ void     pckt_tx_u16             (pckt_inst_t * const pckt_inst, const uint16_t 
 void     pckt_tx_s16             (pckt_inst_t * const pckt_inst, const uint16_t id, const int16_t data);
 void     pckt_tx_u32             (pckt_inst_t * const pckt_inst, const uint16_t id, const uint32_t data);
 void     pckt_tx_s32             (pckt_inst_t * const pckt_inst, const uint16_t id, const int32_t data);
-void     pckt_tx_float_32        (pckt_inst_t * const pckt_inst, const uint16_t id, const float data);
+void     pckt_tx_flt32           (pckt_inst_t * const pckt_inst, const uint16_t id, const float data);
 void     pckt_tx_u64             (pckt_inst_t * const pckt_inst, const uint16_t id, const uint64_t data);
 void     pckt_tx_s64             (pckt_inst_t * const pckt_inst, const uint16_t id, const int64_t data);
-void     pckt_tx_double_64       (pckt_inst_t * const pckt_inst, const uint16_t id, const double data);
+void     pckt_tx_dbl64           (pckt_inst_t * const pckt_inst, const uint16_t id, const double data);
 
 void     pckt_enable             (pckt_inst_t * const pckt_inst, const pckt_en_t enable);
 

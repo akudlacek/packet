@@ -347,6 +347,18 @@ static void packet_cmd_handler(pckt_inst_t *pckt_inst, pckt_rx_t pckt_rx)
 	uint8_t successful = 0;
 	static uint16_t last_id;
 
+	uint8_t   u8_rx_val;
+	int8_t    s8_rx_val;
+	uint16_t  u16_rx_val;
+	int16_t   s16_rx_val;
+	uint32_t  u32_rx_val;
+	int32_t   s32_rx_val;
+	uint64_t  u64_rx_val;
+	int64_t   s64_rx_val;
+	float     flt32_rx_val;
+	double    dbl64_rx_val;
+
+
 	//B received
 	if(pckt_inst == &b_pckt_inst)
 	{
@@ -360,72 +372,87 @@ static void packet_cmd_handler(pckt_inst_t *pckt_inst, pckt_rx_t pckt_rx)
 		switch(pckt_rx.id)
 		{
 			case 0:
-				if(memcmp(pckt_rx.payload, str_val, sizeof(str_val)) == 0)
-					successful = 1;
+				if(memcmp(pckt_rx.payload, str_val, sizeof(str_val)) == 0) successful = 1;
 				break;
+
 			case 1:
-				if(uint8_val == pckt_rx_u8(pckt_rx))
-					successful = 1;
+				if(pckt_rx_u8(&u8_rx_val, pckt_rx) == PCKT_INVALID_LEN) break;
+				if(uint8_val == u8_rx_val) successful = 1;
 				break;
+
 			case 2:
-				if(int8_val == pckt_rx_s8(pckt_rx))
-					successful = 1;
+				if(pckt_rx_s8(&s8_rx_val, pckt_rx) == PCKT_INVALID_LEN) break;
+				if(int8_val == s8_rx_val) successful = 1;
 				break;
+
 			case 3:
-				if(uint16_val == pckt_rx_u16(pckt_rx))
-					successful = 1;
+				if(pckt_rx_u16(&u16_rx_val, pckt_rx) == PCKT_INVALID_LEN) break;
+				if(uint16_val == u16_rx_val) successful = 1;
 				break;
+
 			case 4:
-				if(int16_val == pckt_rx_s16(pckt_rx))
-					successful = 1;
+				if(pckt_rx_s16(&s16_rx_val, pckt_rx) == PCKT_INVALID_LEN) break;
+				if(int16_val == s16_rx_val) successful = 1;
 				break;
+
 			case 5:
-				if(uint32_val == pckt_rx_u32(pckt_rx))
-					successful = 1;
+				if(pckt_rx_u32(&u32_rx_val, pckt_rx) == PCKT_INVALID_LEN) break;
+				if(uint32_val == u32_rx_val) successful = 1;
 				break;
+
 			case 6:
-				if(int32_val == pckt_rx_s32(pckt_rx))
-					successful = 1;
+				if(pckt_rx_s32(&s32_rx_val, pckt_rx) == PCKT_INVALID_LEN) break;
+				if(int32_val == s32_rx_val) successful = 1;
 				break;
+
 			case 7:
-				if(uint64_val == pckt_rx_u64(pckt_rx))
-					successful = 1;
+				if(pckt_rx_u64(&u64_rx_val, pckt_rx) == PCKT_INVALID_LEN) break;
+				if(uint64_val == u64_rx_val) successful = 1;
 				break;
+
 			case 8:
-				if(int64_val == pckt_rx_s64(pckt_rx))
-					successful = 1;
+				if(pckt_rx_s64(&s64_rx_val, pckt_rx) == PCKT_INVALID_LEN) break;
+				if(int64_val == s64_rx_val) successful = 1;
 				break;
+
 			case 9:
-				if(float_val == pckt_rx_flt32(pckt_rx))
-					successful = 1;
+				if(pckt_rx_flt32(&flt32_rx_val, pckt_rx) == PCKT_INVALID_LEN) break;
+				if(float_val == flt32_rx_val) successful = 1;
 				break;
+
 			case 10:
-				if(double_val == pckt_rx_dbl64(pckt_rx))
-					successful = 1;
+				if(pckt_rx_dbl64(&dbl64_rx_val, pckt_rx) == PCKT_INVALID_LEN) break;
+				if(double_val == dbl64_rx_val) successful = 1;
 				break;
 
 			case 11:
 				//id 11 should NOT get here
-				successful = 0;
-				printf("CHECKSUM FAIL ");
+				printf("CHECKSUM FAIL");
 				while(1);
 				break;
 
 			case 12:
 				//id 12 should NOT get here
-				successful = 0;
-				printf("TIMEOUT FAIL ");
+				printf("TIMEOUT FAIL");
 				while(1);
 				break;
 
 			case 13:
-				if(double_val == pckt_rx_dbl64(pckt_rx))
+				//purposly recieving the wrong type
+				if(pckt_rx_u16(&u16_rx_val, pckt_rx) == PCKT_INVALID_LEN)
+				{
 					successful = 1;
+					break;
+				}
+
+				//id 13 should NOT get here
+				printf("RX LEN MISMATCH FAIL");
+				while(1);
 				break;
 
 			case 0xDEAD:
-				if(pckt_rx.len == 2 && pckt_rx_u16(pckt_rx) == 0xBEEF && pckt_rx.crc_16_checksum == 0x7419)
-					successful = 1;
+				if(pckt_rx_u16(&u16_rx_val, pckt_rx) == PCKT_INVALID_LEN) break;
+				if(0xBEEF == u16_rx_val && pckt_rx.crc_16_checksum == 0x7419) successful = 1;
 				break;
 
 			case PCKT_ID_ERR_CHECKSUM:

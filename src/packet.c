@@ -30,6 +30,10 @@
 * Packet sent
 *  0   1   2   3   4   5   6
 * [DE][AD][02][BE][EF][74][19]
+* 
+* NOTE:
+*	This code should be independant of endianness of the host system, but it was only
+*	tested on a little endian processor.
 */
 
 
@@ -450,27 +454,35 @@ void pckt_enable(pckt_inst_t * const pckt_inst, const pckt_en_t enable)
 }
 
 /******************************************************************************
-*  \brief Packet payload convert to uint16
+*  \brief Packet payload convert to uint8
 *
 *  \note
 ******************************************************************************/
-uint8_t pckt_rx_u8(const pckt_rx_t pckt_rx)
+pckt_rx_valid_t pckt_rx_u8(uint8_t * const dest, const pckt_rx_t pckt_rx)
 {
-	return pckt_rx.payload[0];
+	if(sizeof(*dest) != pckt_rx.len) return PCKT_INVALID_LEN;
+
+	*dest = pckt_rx.payload[0];
+
+	return PCKT_VALID_LEN;
 }
 
 /******************************************************************************
-*  \brief Packet payload convert to int16
+*  \brief Packet payload convert to int8
 *
 *  \note
 ******************************************************************************/
-int8_t pckt_rx_s8(const pckt_rx_t pckt_rx)
+pckt_rx_valid_t pckt_rx_s8(int8_t * const dest, const pckt_rx_t pckt_rx)
 {
     bit8_dat_t bit8_dat;
 
+	if(sizeof(*dest) != pckt_rx.len) return PCKT_INVALID_LEN;
+
     bit8_dat._uint = pckt_rx.payload[0];
 
-	return bit8_dat._int;
+	*dest = bit8_dat._int;
+
+	return PCKT_VALID_LEN;
 }
 
 /******************************************************************************
@@ -478,13 +490,17 @@ int8_t pckt_rx_s8(const pckt_rx_t pckt_rx)
 *
 *  \note
 ******************************************************************************/
-uint16_t pckt_rx_u16(const pckt_rx_t pckt_rx)
+pckt_rx_valid_t pckt_rx_u16(uint16_t * const dest, const pckt_rx_t pckt_rx)
 {
     bit16_dat_t bit16_dat;
 
+	if(sizeof(*dest) != pckt_rx.len) return PCKT_INVALID_LEN;
+
     bit16_dat = unsr_16(pckt_rx.payload);
 
-	return bit16_dat._uint;
+	*dest = bit16_dat._uint;
+
+	return PCKT_VALID_LEN;
 }
 
 /******************************************************************************
@@ -492,13 +508,17 @@ uint16_t pckt_rx_u16(const pckt_rx_t pckt_rx)
 *
 *  \note
 ******************************************************************************/
-int16_t pckt_rx_s16(const pckt_rx_t pckt_rx)
+pckt_rx_valid_t pckt_rx_s16(int16_t * const dest, const pckt_rx_t pckt_rx)
 {
     bit16_dat_t bit16_dat;
 
+	if(sizeof(*dest) != pckt_rx.len) return PCKT_INVALID_LEN;
+
     bit16_dat = unsr_16(pckt_rx.payload);
 
-	return bit16_dat._int;
+	*dest = bit16_dat._int;
+
+	return PCKT_VALID_LEN;
 }
 
 /******************************************************************************
@@ -506,13 +526,17 @@ int16_t pckt_rx_s16(const pckt_rx_t pckt_rx)
 *
 *  \note
 ******************************************************************************/
-uint32_t pckt_rx_u32(const pckt_rx_t pckt_rx)
+pckt_rx_valid_t pckt_rx_u32(uint32_t * const dest, const pckt_rx_t pckt_rx)
 {
 	bit32_dat_t bit32_dat;
 
+	if(sizeof(*dest) != pckt_rx.len) return PCKT_INVALID_LEN;
+
     bit32_dat = unsr_32(pckt_rx.payload);
 
-	return bit32_dat._uint;
+	*dest = bit32_dat._uint;
+
+	return PCKT_VALID_LEN;
 }
 
 /******************************************************************************
@@ -520,13 +544,17 @@ uint32_t pckt_rx_u32(const pckt_rx_t pckt_rx)
 *
 *  \note
 ******************************************************************************/
-int32_t pckt_rx_s32(const pckt_rx_t pckt_rx)
+pckt_rx_valid_t pckt_rx_s32(int32_t * const dest, const pckt_rx_t pckt_rx)
 {
 	bit32_dat_t bit32_dat;
 
+	if(sizeof(*dest) != pckt_rx.len) return PCKT_INVALID_LEN;
+
     bit32_dat = unsr_32(pckt_rx.payload);
 
-	return bit32_dat._int;
+	*dest = bit32_dat._int;
+
+	return PCKT_VALID_LEN;
 }
 
 /******************************************************************************
@@ -534,13 +562,17 @@ int32_t pckt_rx_s32(const pckt_rx_t pckt_rx)
 *
 *  \note
 ******************************************************************************/
-float pckt_rx_flt32(const pckt_rx_t pckt_rx)
+pckt_rx_valid_t pckt_rx_flt32(float * const dest, const pckt_rx_t pckt_rx)
 {
 	bit32_dat_t bit32_dat;
 
+	if(sizeof(*dest) != pckt_rx.len) return PCKT_INVALID_LEN;
+
     bit32_dat = unsr_32(pckt_rx.payload);
 
-	return bit32_dat._flt;
+	*dest = bit32_dat._flt;
+
+	return PCKT_VALID_LEN;
 }
 
 /******************************************************************************
@@ -548,13 +580,17 @@ float pckt_rx_flt32(const pckt_rx_t pckt_rx)
 *
 *  \note
 ******************************************************************************/
-uint64_t pckt_rx_u64(const pckt_rx_t pckt_rx)
+pckt_rx_valid_t pckt_rx_u64(uint64_t * const dest, const pckt_rx_t pckt_rx)
 {
 	bit64_dat_t bit64_dat;
 
+	if(sizeof(*dest) != pckt_rx.len) return PCKT_INVALID_LEN;
+
     bit64_dat = unsr_64(pckt_rx.payload);
 
-	return bit64_dat._uint;
+	*dest = bit64_dat._uint;
+
+	return PCKT_VALID_LEN;
 }
 
 /******************************************************************************
@@ -562,13 +598,17 @@ uint64_t pckt_rx_u64(const pckt_rx_t pckt_rx)
 *
 *  \note
 ******************************************************************************/
-int64_t pckt_rx_s64(const pckt_rx_t pckt_rx)
+pckt_rx_valid_t pckt_rx_s64(int64_t * const dest, const pckt_rx_t pckt_rx)
 {
 	bit64_dat_t bit64_dat;
 
+	if(sizeof(*dest) != pckt_rx.len) return PCKT_INVALID_LEN;
+
     bit64_dat = unsr_64(pckt_rx.payload);
 
-	return bit64_dat._int;
+	*dest = bit64_dat._int;
+
+	return PCKT_VALID_LEN;
 }
 
 /******************************************************************************
@@ -576,13 +616,17 @@ int64_t pckt_rx_s64(const pckt_rx_t pckt_rx)
 *
 *  \note
 ******************************************************************************/
-double pckt_rx_dbl64(const pckt_rx_t pckt_rx)
+pckt_rx_valid_t pckt_rx_dbl64(double * const dest, const pckt_rx_t pckt_rx)
 {
 	bit64_dat_t bit64_dat;
 
+	if(sizeof(*dest) != pckt_rx.len) return PCKT_INVALID_LEN;
+
     bit64_dat = unsr_64(pckt_rx.payload);
 
-	return bit64_dat._dbl;
+	*dest = bit64_dat._dbl;
+
+	return PCKT_VALID_LEN;
 }
 
 

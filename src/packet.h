@@ -30,11 +30,20 @@
 #define RX_BUFFER_LEN_BYTES (MAX_PAYLOAD_LEN_BYTES + 5) /*the +5 is [ID:0, ID:1][LEN][CRC16:0, CRC16:1]*/
 
 //Packet error IDs, these are reserved IDs
-typedef enum pckt_id_err_t
+typedef enum pckt_err_id_t
 {
-	PCKT_ID_ERR_CHECKSUM = 0xFFFF,
-	PCKT_ID_ERR_TIMEOUT  = 0xFFFE
-} pckt_id_err_t;
+	//Sends zero byte response packet, because offending ID may not be known.
+	PCKT_ERR_ID_CHKSM   = 0xFFFF, //Rxd packet crc does not match calculated
+	PCKT_ERR_ID_TO      = 0xFFFE, //Rxd an incomplete packet and timeout elapsed
+
+	//Sends two byte response with offending ID as payload.
+	PCKT_ERR_ID_RX_LEN   = 0xFFFD, //Rxd packet payload len is not as expected
+	PCKT_ERR_ID_UKN_ID   = 0xFFFC, //Rxd packet ID is not implemented (User handled error)
+
+	//Sends zero byte response packet
+	PCKT_ERR_ID_ACK      = 0xFF06, //Generic acknowledgment (User handled error)
+	PCKT_ERR_ID_NACK     = 0xFF15  //Generic negative acknowledgment (User handled error)
+} pckt_err_id_t;
 
 /*Packet enable disable enum*/
 typedef enum pckt_en_t
@@ -112,16 +121,18 @@ void     pckt_tx_dbl64           (pckt_inst_t * const pckt_inst, const uint16_t 
 
 void     pckt_enable             (pckt_inst_t * const pckt_inst, const pckt_en_t enable);
 
-pckt_rx_valid_t pckt_rx_u8       (uint8_t * const, const pckt_rx_t pckt_rx);
-pckt_rx_valid_t pckt_rx_s8       (int8_t * const, const pckt_rx_t pckt_rx);
-pckt_rx_valid_t pckt_rx_u16      (uint16_t * const, const pckt_rx_t pckt_rx);
-pckt_rx_valid_t pckt_rx_s16      (int16_t * const, const pckt_rx_t pckt_rx);
-pckt_rx_valid_t pckt_rx_u32      (uint32_t * const, const pckt_rx_t pckt_rx);
-pckt_rx_valid_t pckt_rx_s32      (int32_t * const, const pckt_rx_t pckt_rx);
-pckt_rx_valid_t pckt_rx_flt32    (float * const, const pckt_rx_t pckt_rx);
-pckt_rx_valid_t pckt_rx_u64      (uint64_t * const, const pckt_rx_t pckt_rx);
-pckt_rx_valid_t pckt_rx_s64      (int64_t * const, const pckt_rx_t pckt_rx);
-pckt_rx_valid_t pckt_rx_dbl64    (double * const, const pckt_rx_t pckt_rx);
+pckt_rx_valid_t pckt_rx_u8       (pckt_inst_t * const pckt_inst, uint8_t * const);
+pckt_rx_valid_t pckt_rx_s8       (pckt_inst_t * const pckt_inst, int8_t * const);
+pckt_rx_valid_t pckt_rx_u16      (pckt_inst_t * const pckt_inst, uint16_t * const);
+pckt_rx_valid_t pckt_rx_s16      (pckt_inst_t * const pckt_inst, int16_t * const);
+pckt_rx_valid_t pckt_rx_u32      (pckt_inst_t * const pckt_inst, uint32_t * const);
+pckt_rx_valid_t pckt_rx_s32      (pckt_inst_t * const pckt_inst, int32_t * const);
+pckt_rx_valid_t pckt_rx_flt32    (pckt_inst_t * const pckt_inst, float * const);
+pckt_rx_valid_t pckt_rx_u64      (pckt_inst_t * const pckt_inst, uint64_t * const);
+pckt_rx_valid_t pckt_rx_s64      (pckt_inst_t * const pckt_inst, int64_t * const);
+pckt_rx_valid_t pckt_rx_dbl64    (pckt_inst_t * const pckt_inst, double * const);
+
+void            pckt_err_send    (pckt_inst_t * const pckt_inst, const pckt_err_id_t error);
 
 
 #endif /* PACKET_H_ */

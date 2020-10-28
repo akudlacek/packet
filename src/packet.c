@@ -30,7 +30,7 @@
 * Packet sent
 *  0   1   2   3   4   5   6
 * [DE][AD][02][BE][EF][74][19]
-* 
+*
 * NOTE:
 *	This code should be independant of endianness of the host system, but it was only
 *	tested on a little endian processor.
@@ -86,7 +86,6 @@ typedef union bit64_dat_t
 *************************************************^************************************************/
 static int16_t     dflt_rx_byte   (void);
 static void        dflt_tx_data   (const uint8_t * const data, const uint32_t length);
-static void        err_send       (pckt_inst_t * const packet_inst, const pckt_id_err_t error);
 static bit16_dat_t unsr_16        (const uint8_t * const big_endian_data);
 static bit32_dat_t unsr_32        (const uint8_t * const big_endian_data);
 static bit64_dat_t unsr_64        (const uint8_t * const big_endian_data);
@@ -210,7 +209,7 @@ void pckt_task(pckt_inst_t * const pckt_inst, void(*cmd_handler_fptr)(pckt_inst_
 				}
 				else
 				{
-					err_send(pckt_inst, PCKT_ID_ERR_CHECKSUM);
+					pckt_err_send(pckt_inst, PCKT_ERR_ID_CHKSM);
 				}
 
 				/*Clear buffer*/
@@ -225,7 +224,7 @@ void pckt_task(pckt_inst_t * const pckt_inst, void(*cmd_handler_fptr)(pckt_inst_
 		/*Clear buffer*/
 		pckt_inst->rx_buffer_ind = 0;
 
-		err_send(pckt_inst, PCKT_ID_ERR_TIMEOUT);
+		pckt_err_send(pckt_inst, PCKT_ERR_ID_TO);
 	}
 }
 
@@ -458,11 +457,15 @@ void pckt_enable(pckt_inst_t * const pckt_inst, const pckt_en_t enable)
 *
 *  \note
 ******************************************************************************/
-pckt_rx_valid_t pckt_rx_u8(uint8_t * const dest, const pckt_rx_t pckt_rx)
+pckt_rx_valid_t pckt_rx_u8(pckt_inst_t * const pckt_inst, uint8_t * const dest)
 {
-	if(sizeof(*dest) != pckt_rx.len) return PCKT_INVALID_LEN;
+	if(sizeof(*dest) != pckt_inst->pckt_rx.len)
+	{
+		pckt_err_send(pckt_inst, PCKT_ERR_ID_RX_LEN);
+		return PCKT_INVALID_LEN;
+	}
 
-	*dest = pckt_rx.payload[0];
+	*dest = pckt_inst->pckt_rx.payload[0];
 
 	return PCKT_VALID_LEN;
 }
@@ -472,13 +475,17 @@ pckt_rx_valid_t pckt_rx_u8(uint8_t * const dest, const pckt_rx_t pckt_rx)
 *
 *  \note
 ******************************************************************************/
-pckt_rx_valid_t pckt_rx_s8(int8_t * const dest, const pckt_rx_t pckt_rx)
+pckt_rx_valid_t pckt_rx_s8(pckt_inst_t * const pckt_inst, int8_t * const dest)
 {
     bit8_dat_t bit8_dat;
 
-	if(sizeof(*dest) != pckt_rx.len) return PCKT_INVALID_LEN;
+	if(sizeof(*dest) != pckt_inst->pckt_rx.len)
+	{
+		pckt_err_send(pckt_inst, PCKT_ERR_ID_RX_LEN);
+		return PCKT_INVALID_LEN;
+	}
 
-    bit8_dat._uint = pckt_rx.payload[0];
+    bit8_dat._uint = pckt_inst->pckt_rx.payload[0];
 
 	*dest = bit8_dat._int;
 
@@ -490,13 +497,17 @@ pckt_rx_valid_t pckt_rx_s8(int8_t * const dest, const pckt_rx_t pckt_rx)
 *
 *  \note
 ******************************************************************************/
-pckt_rx_valid_t pckt_rx_u16(uint16_t * const dest, const pckt_rx_t pckt_rx)
+pckt_rx_valid_t pckt_rx_u16(pckt_inst_t * const pckt_inst, uint16_t * const dest)
 {
     bit16_dat_t bit16_dat;
 
-	if(sizeof(*dest) != pckt_rx.len) return PCKT_INVALID_LEN;
+	if(sizeof(*dest) != pckt_inst->pckt_rx.len)
+	{
+		pckt_err_send(pckt_inst, PCKT_ERR_ID_RX_LEN);
+		return PCKT_INVALID_LEN;
+	}
 
-    bit16_dat = unsr_16(pckt_rx.payload);
+    bit16_dat = unsr_16(pckt_inst->pckt_rx.payload);
 
 	*dest = bit16_dat._uint;
 
@@ -508,13 +519,17 @@ pckt_rx_valid_t pckt_rx_u16(uint16_t * const dest, const pckt_rx_t pckt_rx)
 *
 *  \note
 ******************************************************************************/
-pckt_rx_valid_t pckt_rx_s16(int16_t * const dest, const pckt_rx_t pckt_rx)
+pckt_rx_valid_t pckt_rx_s16(pckt_inst_t * const pckt_inst, int16_t * const dest)
 {
     bit16_dat_t bit16_dat;
 
-	if(sizeof(*dest) != pckt_rx.len) return PCKT_INVALID_LEN;
+	if(sizeof(*dest) != pckt_inst->pckt_rx.len)
+	{
+		pckt_err_send(pckt_inst, PCKT_ERR_ID_RX_LEN);
+		return PCKT_INVALID_LEN;
+	}
 
-    bit16_dat = unsr_16(pckt_rx.payload);
+    bit16_dat = unsr_16(pckt_inst->pckt_rx.payload);
 
 	*dest = bit16_dat._int;
 
@@ -526,13 +541,17 @@ pckt_rx_valid_t pckt_rx_s16(int16_t * const dest, const pckt_rx_t pckt_rx)
 *
 *  \note
 ******************************************************************************/
-pckt_rx_valid_t pckt_rx_u32(uint32_t * const dest, const pckt_rx_t pckt_rx)
+pckt_rx_valid_t pckt_rx_u32(pckt_inst_t * const pckt_inst, uint32_t * const dest)
 {
 	bit32_dat_t bit32_dat;
 
-	if(sizeof(*dest) != pckt_rx.len) return PCKT_INVALID_LEN;
+	if(sizeof(*dest) != pckt_inst->pckt_rx.len)
+	{
+		pckt_err_send(pckt_inst, PCKT_ERR_ID_RX_LEN);
+		return PCKT_INVALID_LEN;
+	}
 
-    bit32_dat = unsr_32(pckt_rx.payload);
+    bit32_dat = unsr_32(pckt_inst->pckt_rx.payload);
 
 	*dest = bit32_dat._uint;
 
@@ -544,13 +563,17 @@ pckt_rx_valid_t pckt_rx_u32(uint32_t * const dest, const pckt_rx_t pckt_rx)
 *
 *  \note
 ******************************************************************************/
-pckt_rx_valid_t pckt_rx_s32(int32_t * const dest, const pckt_rx_t pckt_rx)
+pckt_rx_valid_t pckt_rx_s32(pckt_inst_t * const pckt_inst, int32_t * const dest)
 {
 	bit32_dat_t bit32_dat;
 
-	if(sizeof(*dest) != pckt_rx.len) return PCKT_INVALID_LEN;
+	if(sizeof(*dest) != pckt_inst->pckt_rx.len)
+	{
+		pckt_err_send(pckt_inst, PCKT_ERR_ID_RX_LEN);
+		return PCKT_INVALID_LEN;
+	}
 
-    bit32_dat = unsr_32(pckt_rx.payload);
+    bit32_dat = unsr_32(pckt_inst->pckt_rx.payload);
 
 	*dest = bit32_dat._int;
 
@@ -562,13 +585,17 @@ pckt_rx_valid_t pckt_rx_s32(int32_t * const dest, const pckt_rx_t pckt_rx)
 *
 *  \note
 ******************************************************************************/
-pckt_rx_valid_t pckt_rx_flt32(float * const dest, const pckt_rx_t pckt_rx)
+pckt_rx_valid_t pckt_rx_flt32(pckt_inst_t * const pckt_inst, float * const dest)
 {
 	bit32_dat_t bit32_dat;
 
-	if(sizeof(*dest) != pckt_rx.len) return PCKT_INVALID_LEN;
+	if(sizeof(*dest) != pckt_inst->pckt_rx.len)
+	{
+		pckt_err_send(pckt_inst, PCKT_ERR_ID_RX_LEN);
+		return PCKT_INVALID_LEN;
+	}
 
-    bit32_dat = unsr_32(pckt_rx.payload);
+    bit32_dat = unsr_32(pckt_inst->pckt_rx.payload);
 
 	*dest = bit32_dat._flt;
 
@@ -580,13 +607,17 @@ pckt_rx_valid_t pckt_rx_flt32(float * const dest, const pckt_rx_t pckt_rx)
 *
 *  \note
 ******************************************************************************/
-pckt_rx_valid_t pckt_rx_u64(uint64_t * const dest, const pckt_rx_t pckt_rx)
+pckt_rx_valid_t pckt_rx_u64(pckt_inst_t * const pckt_inst, uint64_t * const dest)
 {
 	bit64_dat_t bit64_dat;
 
-	if(sizeof(*dest) != pckt_rx.len) return PCKT_INVALID_LEN;
+	if(sizeof(*dest) != pckt_inst->pckt_rx.len)
+	{
+		pckt_err_send(pckt_inst, PCKT_ERR_ID_RX_LEN);
+		return PCKT_INVALID_LEN;
+	}
 
-    bit64_dat = unsr_64(pckt_rx.payload);
+    bit64_dat = unsr_64(pckt_inst->pckt_rx.payload);
 
 	*dest = bit64_dat._uint;
 
@@ -598,13 +629,17 @@ pckt_rx_valid_t pckt_rx_u64(uint64_t * const dest, const pckt_rx_t pckt_rx)
 *
 *  \note
 ******************************************************************************/
-pckt_rx_valid_t pckt_rx_s64(int64_t * const dest, const pckt_rx_t pckt_rx)
+pckt_rx_valid_t pckt_rx_s64(pckt_inst_t * const pckt_inst, int64_t * const dest)
 {
 	bit64_dat_t bit64_dat;
 
-	if(sizeof(*dest) != pckt_rx.len) return PCKT_INVALID_LEN;
+	if(sizeof(*dest) != pckt_inst->pckt_rx.len)
+	{
+		pckt_err_send(pckt_inst, PCKT_ERR_ID_RX_LEN);
+		return PCKT_INVALID_LEN;
+	}
 
-    bit64_dat = unsr_64(pckt_rx.payload);
+    bit64_dat = unsr_64(pckt_inst->pckt_rx.payload);
 
 	*dest = bit64_dat._int;
 
@@ -616,17 +651,46 @@ pckt_rx_valid_t pckt_rx_s64(int64_t * const dest, const pckt_rx_t pckt_rx)
 *
 *  \note
 ******************************************************************************/
-pckt_rx_valid_t pckt_rx_dbl64(double * const dest, const pckt_rx_t pckt_rx)
+pckt_rx_valid_t pckt_rx_dbl64(pckt_inst_t * const pckt_inst, double * const dest)
 {
 	bit64_dat_t bit64_dat;
 
-	if(sizeof(*dest) != pckt_rx.len) return PCKT_INVALID_LEN;
+	if(sizeof(*dest) != pckt_inst->pckt_rx.len)
+	{
+		pckt_err_send(pckt_inst, PCKT_ERR_ID_RX_LEN);
+		return PCKT_INVALID_LEN;
+	}
 
-    bit64_dat = unsr_64(pckt_rx.payload);
+    bit64_dat = unsr_64(pckt_inst->pckt_rx.payload);
 
 	*dest = bit64_dat._dbl;
 
 	return PCKT_VALID_LEN;
+}
+
+/******************************************************************************
+*  \brief Error send
+*
+*  \note
+******************************************************************************/
+void pckt_err_send(pckt_inst_t * const pckt_inst, const pckt_err_id_t error)
+{
+	switch(error)
+	{
+		//zero byte payload
+		case PCKT_ERR_ID_CHKSM:
+		case PCKT_ERR_ID_TO:
+		case PCKT_ERR_ID_ACK:
+		case PCKT_ERR_ID_NACK:
+			pckt_tx_raw(pckt_inst, (uint16_t)error, 0, 0);
+			break;
+
+		//offending ID as payload
+		case PCKT_ERR_ID_RX_LEN:
+		case PCKT_ERR_ID_UKN_ID:
+			pckt_tx_u16(pckt_inst, error, pckt_inst->pckt_rx.id);
+			break;
+	}
 }
 
 
@@ -651,16 +715,6 @@ static int16_t dflt_rx_byte(void)
 static void dflt_tx_data(const uint8_t * const data, const uint32_t length)
 {
 	//empty
-}
-
-/******************************************************************************
-*  \brief Error handler
-*
-*  \note This sends a packet which contains no data bytes but the ID indicates the error
-******************************************************************************/
-static void err_send(pckt_inst_t * const pckt_inst, const pckt_id_err_t error)
-{
-	pckt_tx_raw(pckt_inst, (uint16_t)error, 0, 0);
 }
 
 /******************************************************************************

@@ -106,7 +106,7 @@ int main(void)
 	uint32_t id = 0;
 
 	uint32_t i;
-	uint8_t tmp_data_arr[RX_BUFFER_LEN_BYTES];
+	uint8_t tmp_data_arr[RX_BUFFER_LEN_BYTES] = {0};
 
 	/* initialize random seed: */
 	srand((unsigned int)time(NULL));
@@ -345,7 +345,7 @@ static void b_tx_data(const uint8_t * const data, uint32_t length)
 static void packet_cmd_handler(pckt_inst_t *pckt_inst, pckt_rx_t pckt_rx)
 {
 	uint8_t successful = 0;
-	static uint16_t last_id;
+	static uint16_t last_id = 0;
 
 	uint8_t   u8_rx_val;
 	int8_t    s8_rx_val;
@@ -376,52 +376,52 @@ static void packet_cmd_handler(pckt_inst_t *pckt_inst, pckt_rx_t pckt_rx)
 				break;
 
 			case 1:
-				if(pckt_rx_u8(&u8_rx_val, pckt_rx) == PCKT_INVALID_LEN) break;
+				if(pckt_rx_u8(&a_pckt_inst, &u8_rx_val) == PCKT_INVALID_LEN) break;
 				if(uint8_val == u8_rx_val) successful = 1;
 				break;
 
 			case 2:
-				if(pckt_rx_s8(&s8_rx_val, pckt_rx) == PCKT_INVALID_LEN) break;
+				if(pckt_rx_s8(&a_pckt_inst, &s8_rx_val) == PCKT_INVALID_LEN) break;
 				if(int8_val == s8_rx_val) successful = 1;
 				break;
 
 			case 3:
-				if(pckt_rx_u16(&u16_rx_val, pckt_rx) == PCKT_INVALID_LEN) break;
+				if(pckt_rx_u16(&a_pckt_inst, &u16_rx_val) == PCKT_INVALID_LEN) break;
 				if(uint16_val == u16_rx_val) successful = 1;
 				break;
 
 			case 4:
-				if(pckt_rx_s16(&s16_rx_val, pckt_rx) == PCKT_INVALID_LEN) break;
+				if(pckt_rx_s16(&a_pckt_inst, &s16_rx_val) == PCKT_INVALID_LEN) break;
 				if(int16_val == s16_rx_val) successful = 1;
 				break;
 
 			case 5:
-				if(pckt_rx_u32(&u32_rx_val, pckt_rx) == PCKT_INVALID_LEN) break;
+				if(pckt_rx_u32(&a_pckt_inst, &u32_rx_val) == PCKT_INVALID_LEN) break;
 				if(uint32_val == u32_rx_val) successful = 1;
 				break;
 
 			case 6:
-				if(pckt_rx_s32(&s32_rx_val, pckt_rx) == PCKT_INVALID_LEN) break;
+				if(pckt_rx_s32(&a_pckt_inst, &s32_rx_val) == PCKT_INVALID_LEN) break;
 				if(int32_val == s32_rx_val) successful = 1;
 				break;
 
 			case 7:
-				if(pckt_rx_u64(&u64_rx_val, pckt_rx) == PCKT_INVALID_LEN) break;
+				if(pckt_rx_u64(&a_pckt_inst, &u64_rx_val) == PCKT_INVALID_LEN) break;
 				if(uint64_val == u64_rx_val) successful = 1;
 				break;
 
 			case 8:
-				if(pckt_rx_s64(&s64_rx_val, pckt_rx) == PCKT_INVALID_LEN) break;
+				if(pckt_rx_s64(&a_pckt_inst, &s64_rx_val) == PCKT_INVALID_LEN) break;
 				if(int64_val == s64_rx_val) successful = 1;
 				break;
 
 			case 9:
-				if(pckt_rx_flt32(&flt32_rx_val, pckt_rx) == PCKT_INVALID_LEN) break;
+				if(pckt_rx_flt32(&a_pckt_inst, &flt32_rx_val) == PCKT_INVALID_LEN) break;
 				if(float_val == flt32_rx_val) successful = 1;
 				break;
 
 			case 10:
-				if(pckt_rx_dbl64(&dbl64_rx_val, pckt_rx) == PCKT_INVALID_LEN) break;
+				if(pckt_rx_dbl64(&a_pckt_inst, &dbl64_rx_val) == PCKT_INVALID_LEN) break;
 				if(double_val == dbl64_rx_val) successful = 1;
 				break;
 
@@ -439,7 +439,7 @@ static void packet_cmd_handler(pckt_inst_t *pckt_inst, pckt_rx_t pckt_rx)
 
 			case 13:
 				//purposly recieving the wrong type
-				if(pckt_rx_u16(&u16_rx_val, pckt_rx) == PCKT_INVALID_LEN)
+				if(pckt_rx_u16(&a_pckt_inst, &u16_rx_val) == PCKT_INVALID_LEN)
 				{
 					successful = 1;
 					break;
@@ -451,11 +451,11 @@ static void packet_cmd_handler(pckt_inst_t *pckt_inst, pckt_rx_t pckt_rx)
 				break;
 
 			case 0xDEAD:
-				if(pckt_rx_u16(&u16_rx_val, pckt_rx) == PCKT_INVALID_LEN) break;
+				if(pckt_rx_u16(&a_pckt_inst, &u16_rx_val) == PCKT_INVALID_LEN) break;
 				if(0xBEEF == u16_rx_val && pckt_rx.crc_16_checksum == 0x7419) successful = 1;
 				break;
 
-			case PCKT_ID_ERR_CHECKSUM:
+			case PCKT_ERR_ID_CHKSM:
 				successful = 2;
 				if(last_id == 10)
 				{
@@ -469,9 +469,9 @@ static void packet_cmd_handler(pckt_inst_t *pckt_inst, pckt_rx_t pckt_rx)
 				}
 				break;
 
-			case PCKT_ID_ERR_TIMEOUT:
+			case PCKT_ERR_ID_TO:
 				successful = 2;
-				if((last_id == 11) || (last_id == PCKT_ID_ERR_CHECKSUM))
+				if((last_id == 11) || (last_id == PCKT_ERR_ID_CHKSM))
 				{
 					//if last id was 11 then 11 failed test, if PCKT_ID_ERR_CHECKSUM was last then id 11 passed, FYI
 					//id 12 should return an error
@@ -558,10 +558,10 @@ static uint16_t rand_uint16_slow(void)
 ******************************************************************************/
 static void gen_rand_vals(void)
 {
-    bit8_dat_t  tmp_8bit;
-    bit16_dat_t tmp_16bit;
-    bit32_dat_t tmp_32bit;
-    bit64_dat_t tmp_64bit;
+    bit8_dat_t  tmp_8bit = {0};
+    bit16_dat_t tmp_16bit = {0};
+    bit32_dat_t tmp_32bit = {0};
+    bit64_dat_t tmp_64bit = {0};
 
      tmp_8bit._uint = rand();
     tmp_16bit._uint = rand_uint16_slow();

@@ -110,6 +110,7 @@ void pckt_get_config_defaults(pckt_conf_t * const pckt_conf)
 	pckt_conf->crc_16_fptr           = pckt_sw_crc;
 	pckt_conf->clear_buffer_timeout  = 0xFFFFFFFF;
 	pckt_conf->enable                = PCKT_ENABLED;
+	pckt_conf->err_rply              = PCKT_ENABLED;
 }
 
 /******************************************************************************
@@ -675,6 +676,8 @@ pckt_rx_valid_t pckt_rx_dbl64(pckt_inst_t * const pckt_inst, double * const dest
 ******************************************************************************/
 void pckt_err_send(pckt_inst_t * const pckt_inst, const pckt_err_id_t error)
 {
+	if(pckt_inst->conf.err_rply == PCKT_DISABLED) return; //Do not transmit error
+	
 	switch(error)
 	{
 		//zero byte payload

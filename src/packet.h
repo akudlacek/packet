@@ -75,7 +75,8 @@ typedef	struct pckt_conf_t
 	void (*tx_data_fprt)(const uint8_t * const, uint32_t);    //function pointer for transmit, ptr to 8 bit data array and length
 	uint16_t (*crc_16_fptr)(const uint8_t * const, uint32_t); //function pointer for crc-16, default will be sw_crc
 	uint32_t clear_buffer_timeout;                            //timeout for buffer to be cleared when incomplete packet received
-	pckt_en_t enable;                                   //enable or disable packet instance
+	pckt_en_t enable;                                         //enable or disable packet instance
+	pckt_en_t err_rply;                                       //enable error response over tx line
 } pckt_conf_t;
 
 /*Packet instance struct*/

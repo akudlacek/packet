@@ -230,6 +230,16 @@ void pckt_task(pckt_inst_t * const pckt_inst, void(*cmd_handler_fptr)(pckt_inst_
 }
 
 /******************************************************************************
+*  \brief Flush receive buffer
+*
+*  \note 
+******************************************************************************/
+void pckt_flush_rx(pckt_inst_t * const pckt_inst)
+{
+	pckt_inst->rx_buffer_ind = 0;
+}
+
+/******************************************************************************
 *  \brief Software CRC (SLOW)
 *
 *  \note https://barrgroup.com/Embedded-Systems/How-To/CRC-Calculation-C-Code

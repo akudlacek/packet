@@ -106,6 +106,7 @@ typedef enum pckt_rx_valid_t
 void     pckt_get_config_defaults(pckt_conf_t * const pckt_conf);
 void     pckt_init               (pckt_inst_t * const pckt_inst, const pckt_conf_t pckt_conf);
 void     pckt_task               (pckt_inst_t * const pckt_inst, void(*cmd_handler_fptr)(pckt_inst_t * const, const pckt_rx_t));
+void     pckt_flush_rx           (pckt_inst_t * const pckt_inst);
 crc_t    pckt_sw_crc             (const uint8_t * const message, const uint32_t num_bytes);
 void     pckt_tx_raw             (pckt_inst_t * const pckt_inst, const uint16_t id, const uint8_t * const data, const uint8_t len);
 

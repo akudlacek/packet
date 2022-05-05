@@ -39,8 +39,6 @@
 
 #include "packet.h"
 
-#include <string.h>
-
 /**************************************************************************************************
 *                                             DEFINES
 *************************************************^************************************************/
@@ -104,7 +102,7 @@ static void        sr_64          (uint8_t * const dest, const uint64_t src);
 ******************************************************************************/
 void pckt_get_config_defaults(pckt_conf_t * const pckt_conf)
 {
-	pckt_conf->tick_ptr              = NULL;
+	pckt_conf->tick_ptr              = 0;
 	pckt_conf->rx_byte_fptr          = dflt_rx_byte;
 	pckt_conf->tx_data_fprt          = dflt_tx_data;
 	pckt_conf->crc_16_fptr           = pckt_sw_crc;
@@ -125,10 +123,8 @@ void pckt_init(pckt_inst_t * const pckt_inst, const pckt_conf_t pckt_conf)
 
 	/*Inst*/
 	pckt_inst->rx_byte              = 0;
-	memset(pckt_inst->rx_buffer, 0, sizeof(pckt_inst->rx_buffer));
 	pckt_inst->rx_buffer_ind        = 0;
 	pckt_inst->calc_crc_16_checksum = 0;
-	memset(&pckt_inst->pckt_rx, 0, sizeof(pckt_inst->pckt_rx));
 	pckt_inst->last_tick            = *pckt_inst->conf.tick_ptr;
 }
 
@@ -139,6 +135,8 @@ void pckt_init(pckt_inst_t * const pckt_inst, const pckt_conf_t pckt_conf)
 ******************************************************************************/
 void pckt_task(pckt_inst_t * const pckt_inst, void(*cmd_handler_fptr)(pckt_inst_t * const, const pckt_rx_t))
 {
+	uint8_t i;
+	
 	/*If packet is disabled do not run*/
 	if(pckt_inst->conf.enable == PCKT_DISABLED) return;
 
@@ -197,12 +195,18 @@ void pckt_task(pckt_inst_t * const pckt_inst, void(*cmd_handler_fptr)(pckt_inst_
 					/*Copy data - if data in packet*/
 					if(pckt_inst->pckt_rx.len > 0)
 					{
-						memcpy(pckt_inst->pckt_rx.payload, &pckt_inst->rx_buffer[DATA_N_POS], pckt_inst->pckt_rx.len);
+						for(i = 0; i < pckt_inst->pckt_rx.len; i++)
+						{
+							pckt_inst->pckt_rx.payload[i] = pckt_inst->rx_buffer[DATA_N_POS + i];
+						}
 					}
 					/*Fill with zeros*/
 					else
 					{
-						memset(pckt_inst->pckt_rx.payload, 0, sizeof(pckt_inst->pckt_rx.payload));
+						for(i = 0; i < pckt_inst->pckt_rx.len; i++)
+						{
+							pckt_inst->pckt_rx.payload[i] = 0;
+						}
 					}
 
 					/*Run command handler*/
@@ -283,6 +287,7 @@ crc_t pckt_sw_crc(const uint8_t * const message, const uint32_t num_bytes)
 ******************************************************************************/
 void pckt_tx_raw(pckt_inst_t * const pckt_inst, const uint16_t id, const uint8_t * const data, uint8_t len)
 {
+	uint8_t i;
 	uint8_t pckt[RX_BUFFER_LEN_BYTES];
 	uint16_t checksum;
 
@@ -297,7 +302,10 @@ void pckt_tx_raw(pckt_inst_t * const pckt_inst, const uint16_t id, const uint8_t
 	pckt[ID_0_POS] = (uint8_t)id;
 	pckt[LEN_POS]  = len;
 
-	memcpy(&pckt[DATA_N_POS], data, len);
+	for(i = 0; i < len; i++)
+	{
+		pckt[DATA_N_POS + i] = data[i];
+	}
 
 	/*Calc checksum*/
 	checksum = pckt_inst->conf.crc_16_fptr(pckt, (len + 3));

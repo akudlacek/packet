@@ -83,7 +83,7 @@ typedef union bit64_dat_t
 *                                         LOCAL PROTOTYPES
 *************************************************^************************************************/
 static int16_t     dflt_rx_byte   (void);
-static void        dflt_tx_data   (const uint8_t * const data, const uint32_t length);
+static void        dflt_tx_data   (const uint8_t * const data, const uint8_t length);
 static bit16_dat_t unsr_16        (const uint8_t * const big_endian_data);
 static bit32_dat_t unsr_32        (const uint8_t * const big_endian_data);
 static bit64_dat_t unsr_64        (const uint8_t * const big_endian_data);
@@ -106,7 +106,7 @@ void pckt_get_config_defaults(pckt_conf_t * const pckt_conf)
 	pckt_conf->rx_byte_fptr          = dflt_rx_byte;
 	pckt_conf->tx_data_fprt          = dflt_tx_data;
 	pckt_conf->crc_16_fptr           = pckt_sw_crc;
-	pckt_conf->clear_buffer_timeout  = 0xFFFFFFFF;
+	pckt_conf->clear_buffer_timeout  = 1000;
 	pckt_conf->enable                = PCKT_ENABLED;
 	pckt_conf->err_rply              = PCKT_ENABLED;
 }
@@ -251,12 +251,13 @@ void pckt_flush_rx(pckt_inst_t * const pckt_inst)
 *        CRC-16 (CRC-CCITT)
 *        Calculator: http://www.sunshine2k.de/coding/javascript/crc/crc_js.html
 ******************************************************************************/
-crc_t pckt_sw_crc(const uint8_t * const message, const uint32_t num_bytes)
+crc_t pckt_sw_crc(const uint8_t * const message, const uint8_t num_bytes)
 {
 	crc_t remainder = 0;
+	uint8_t byte;
 
 	/*Perform modulo-2 division, a byte at a time.*/
-	for(uint32_t byte = 0; byte < num_bytes; ++byte)
+	for(byte = 0; byte < num_bytes; ++byte)
 	{
 		/*Bring the next byte into the remainder.*/
 		remainder ^= (message[byte] << (SW_CRC_WIDTH - 8));
@@ -733,7 +734,7 @@ static int16_t dflt_rx_byte(void)
 *
 *  \note
 ******************************************************************************/
-static void dflt_tx_data(const uint8_t * const data, const uint32_t length)
+static void dflt_tx_data(const uint8_t * const data, const uint8_t length)
 {
 	//empty
 }

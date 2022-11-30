@@ -29,6 +29,10 @@
 
 #define RX_BUFFER_LEN_BYTES (MAX_PAYLOAD_LEN_BYTES + 5) /*the +5 is [ID:0, ID:1][LEN][CRC16:0, CRC16:1]*/
 
+#ifndef TICK_TYPE
+#define TICK_TYPE uint32_t
+#endif
+
 //Packet error IDs, these are reserved IDs
 typedef enum pckt_err_id_t
 {
@@ -70,11 +74,11 @@ typedef struct pckt_rx_t
 /*Packet configuration struct*/
 typedef	struct pckt_conf_t
 {
-	const volatile uint32_t *tick_ptr;                        //pointer to sys tick
+	const volatile TICK_TYPE *tick_ptr;                       //pointer to sys tick
 	int16_t (*rx_byte_fptr)(void);                            //function pointer for received byte return -1 for no data or >=0 for valid data
-	void (*tx_data_fprt)(const uint8_t * const, uint32_t);    //function pointer for transmit, ptr to 8 bit data array and length
-	uint16_t (*crc_16_fptr)(const uint8_t * const, uint32_t); //function pointer for crc-16, default will be sw_crc
-	uint32_t clear_buffer_timeout;                            //timeout for buffer to be cleared when incomplete packet received
+	void (*tx_data_fprt)(const uint8_t * const, uint8_t);     //function pointer for transmit, ptr to 8 bit data array and length
+	uint16_t (*crc_16_fptr)(const uint8_t * const, uint8_t);  //function pointer for crc-16, default will be sw_crc
+	TICK_TYPE clear_buffer_timeout;                           //timeout for buffer to be cleared when incomplete packet received
 	pckt_en_t enable;                                         //enable or disable packet instance
 	pckt_en_t err_rply;                                       //enable error response over tx line
 } pckt_conf_t;
@@ -89,7 +93,7 @@ typedef struct pckt_inst_t
 	uint16_t rx_buffer_ind;
 	uint16_t calc_crc_16_checksum;
 	pckt_rx_t pckt_rx;
-	uint32_t last_tick;
+	TICK_TYPE last_tick;
 } pckt_inst_t;
 
 /*Packet return value of rx functions*/
@@ -107,7 +111,7 @@ void     pckt_get_config_defaults(pckt_conf_t * const pckt_conf);
 void     pckt_init               (pckt_inst_t * const pckt_inst, const pckt_conf_t pckt_conf);
 void     pckt_task               (pckt_inst_t * const pckt_inst, void(*cmd_handler_fptr)(pckt_inst_t * const, const pckt_rx_t));
 void     pckt_flush_rx           (pckt_inst_t * const pckt_inst);
-crc_t    pckt_sw_crc             (const uint8_t * const message, const uint32_t num_bytes);
+crc_t    pckt_sw_crc             (const uint8_t * const message, const uint8_t num_bytes);
 void     pckt_tx_raw             (pckt_inst_t * const pckt_inst, const uint16_t id, const uint8_t * const data, const uint8_t len);
 
 void     pckt_tx_u8              (pckt_inst_t * const pckt_inst, const uint16_t id, const uint8_t data);

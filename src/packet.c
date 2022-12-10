@@ -178,7 +178,7 @@ void pckt_task(pckt_inst_t * const pckt_inst, void(*cmd_handler_fptr)(pckt_inst_
 			}
 
 			/*Check data received to see if all bytes received - the +5 is [ID:0, ID:1][LEN][CRC16:0, CRC16:1]*/
-			if((pckt_inst->pckt_rx.len + 5) == pckt_inst->rx_buffer_ind)
+			if((pckt_inst->pckt_rx.len + 5u) == pckt_inst->rx_buffer_ind)
 			{
 				/*Calculate checksum - performed on [ID:0, ID:1][LEN][PAYLOAD:0 ...,  PAYLOAD:n] if LEN=0 then just [ID:0, ID:1][LEN]*/
 				pckt_inst->calc_crc_16_checksum = pckt_inst->conf.crc_16_fptr(pckt_inst->rx_buffer, (pckt_inst->rx_buffer_ind - 2)); //subtract 2 bytes for [CRC16:0, CRC16:1]

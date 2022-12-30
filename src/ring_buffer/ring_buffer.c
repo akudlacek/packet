@@ -38,7 +38,7 @@
 /**************************************************************************************************
 *                                         LOCAL PROTOTYPES
 *************************************************^************************************************/
-static inline void set_peak_usage(ring_buffer_t *ring_buffer, uint16_t usage);
+static inline void set_peak_usage(ring_buffer_t * const ring_buffer, const uint16_t usage);
 
 
 /**************************************************************************************************
@@ -49,7 +49,7 @@ static inline void set_peak_usage(ring_buffer_t *ring_buffer, uint16_t usage);
 *
 *  \note Must initialize the struct before using ring buffer put and get
 ******************************************************************************/
-void ring_buffer_init(ring_buffer_t * const ring_buffer, volatile uint8_t * const buffer_array, uint16_t buffer_array_size)
+void ring_buffer_init(ring_buffer_t * const ring_buffer, volatile uint8_t * const buffer_array, const uint16_t buffer_array_size)
 {
 	ring_buffer->rb_state = BUFFER_EMPTY;
 	ring_buffer->rb_buffer_array = buffer_array;
@@ -66,7 +66,7 @@ void ring_buffer_init(ring_buffer_t * const ring_buffer, volatile uint8_t * cons
 *        returns 0 for no error and -1 for buffer overflow where oldest data
 *        was dumped
 ******************************************************************************/
-int8_t ring_buffer_put_data(ring_buffer_t *ring_buffer, uint8_t data_to_put)
+int8_t ring_buffer_put_data(ring_buffer_t * const ring_buffer, const uint8_t data_to_put)
 {
      /*0 for no error, -1 for overflow*/
 	int8_t overflow_flag = 0;
@@ -124,7 +124,7 @@ int8_t ring_buffer_put_data(ring_buffer_t *ring_buffer, uint8_t data_to_put)
 *
 *  \note Takes in ring_buffer_struct, returns data or -1 for buffer empty
 ******************************************************************************/
-int16_t ring_buffer_get_data(ring_buffer_t *ring_buffer)
+int16_t ring_buffer_get_data(ring_buffer_t * const ring_buffer)
 {
     /*-1 for empty*/
 	int16_t return_data = 0;
@@ -159,7 +159,7 @@ int16_t ring_buffer_get_data(ring_buffer_t *ring_buffer)
 *        Only able to see up to rb_buffer_size, so cannot see how many over
 *        the max was used.
 ******************************************************************************/
-uint16_t ring_buffer_get_max_usage(ring_buffer_t *ring_buffer)
+uint16_t ring_buffer_get_max_usage(ring_buffer_t * const ring_buffer)
 {
     return ring_buffer->rb_max_usage;
 }
@@ -173,7 +173,7 @@ uint16_t ring_buffer_get_max_usage(ring_buffer_t *ring_buffer)
 *
 *  \note Only changes if exceeds previous max
 ******************************************************************************/
-static inline void set_peak_usage(ring_buffer_t *ring_buffer, uint16_t usage)
+static inline void set_peak_usage(ring_buffer_t * const ring_buffer, const uint16_t usage)
 {
     if(usage > ring_buffer->rb_max_usage)
         ring_buffer->rb_max_usage = usage;

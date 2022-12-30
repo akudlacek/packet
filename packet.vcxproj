@@ -26,6 +26,7 @@
   <ItemGroup>
     <ClInclude Include="src\packet.h" />
     <ClInclude Include="src\ring_buffer\ring_buffer.h" />
+    <ClInclude Include="src\timer.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>

@@ -19,5 +19,6 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\ring_buffer\ring_buffer.h" />
+    <ClInclude Include="src\timer.h" />
   </ItemGroup>
 </Project>

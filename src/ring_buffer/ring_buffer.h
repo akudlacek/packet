@@ -16,13 +16,13 @@
 /**************************************************************************************************
 *                                             DEFINES
 *************************************************^************************************************/
-typedef enum
+typedef enum ring_buffer_state_t
 {
 	BUFFER_EMPTY,
 	BUFFER_HAS_DATA
 } ring_buffer_state_t;
 
-typedef struct
+typedef struct ring_buffer_t
 {
 	ring_buffer_state_t rb_state;
 	volatile uint8_t *rb_buffer_array;
@@ -36,10 +36,10 @@ typedef struct
 /**************************************************************************************************
 *                                            PROTOTYPES
 *************************************************^************************************************/
-void ring_buffer_init(ring_buffer_t * const ring_buffer, volatile uint8_t * const buffer_array, uint16_t buffer_array_size);
-int8_t ring_buffer_put_data(ring_buffer_t *ring_buffer, uint8_t data_to_put);
-int16_t ring_buffer_get_data(ring_buffer_t *ring_buffer);
-uint16_t ring_buffer_get_max_usage(ring_buffer_t *ring_buffer);
+void     ring_buffer_init         (ring_buffer_t * const ring_buffer, volatile uint8_t * const buffer_array, const uint16_t buffer_array_size);
+int8_t   ring_buffer_put_data     (ring_buffer_t * const ring_buffer, const uint8_t data_to_put);
+int16_t  ring_buffer_get_data     (ring_buffer_t * const ring_buffer);
+uint16_t ring_buffer_get_max_usage(ring_buffer_t * const ring_buffer);
 
 
 #endif /* RING_BUFFER_H_ */

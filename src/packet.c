@@ -38,6 +38,7 @@
 
 
 #include "packet.h"
+#include "timer.h"
 
 /**************************************************************************************************
 *                                             DEFINES
@@ -102,7 +103,6 @@ static void        sr_64          (uint8_t * const dest, const uint64_t src);
 ******************************************************************************/
 void pckt_get_config_defaults(pckt_conf_t * const pckt_conf)
 {
-	pckt_conf->tick_ptr              = 0;
 	pckt_conf->rx_byte_fptr          = dflt_rx_byte;
 	pckt_conf->tx_data_fprt          = dflt_tx_data;
 	pckt_conf->crc_16_fptr           = pckt_sw_crc;
@@ -125,7 +125,7 @@ void pckt_init(pckt_inst_t * const pckt_inst, const pckt_conf_t pckt_conf)
 	pckt_inst->rx_byte              = 0;
 	pckt_inst->rx_buffer_ind        = 0;
 	pckt_inst->calc_crc_16_checksum = 0;
-	pckt_inst->last_tick            = *pckt_inst->conf.tick_ptr;
+	tmrReset(&pckt_inst->last_tick);
 }
 
 /******************************************************************************
@@ -147,7 +147,7 @@ void pckt_task(pckt_inst_t * const pckt_inst, void(*cmd_handler_fptr)(pckt_inst_
 	if(pckt_inst->rx_byte != -1)
 	{
 		/*Record time of last byte*/
-		pckt_inst->last_tick = *pckt_inst->conf.tick_ptr;
+		tmrReset(&pckt_inst->last_tick);
 
 		/*Is received buffer full?*/
 		if(pckt_inst->rx_buffer_ind == RX_BUFFER_LEN_BYTES)
@@ -224,7 +224,7 @@ void pckt_task(pckt_inst_t * const pckt_inst, void(*cmd_handler_fptr)(pckt_inst_
 	}
 
 	/*Clear buffer timeout if timeout has expired and there is data in the buffer*/
-	if(((*pckt_inst->conf.tick_ptr - pckt_inst->last_tick) >= pckt_inst->conf.clear_buffer_timeout) && (pckt_inst->rx_buffer_ind > 0))
+	if (tmrCheckReset(&pckt_inst->last_tick, pckt_inst->conf.clear_buffer_timeout) && (pckt_inst->rx_buffer_ind > 0))
 	{
 		/*Clear buffer*/
 		pckt_inst->rx_buffer_ind = 0;
